@@ -1,0 +1,25 @@
+# dependencies & build
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+
+# env (the site needs no secrets — keep it that way)
+.env
+.env.*
+
+# local agent memory (only the README is tracked)
+.agents/memory/local/*
+!.agents/memory/local/README.md
+
+# provider-local settings
+.claude/settings.local.json
+
+# screenshots for PRs
+.pr-screenshots/
+
+# OS / editor cruft
+.DS_Store
+*.log
+.idea/
+.vscode/
