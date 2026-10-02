@@ -46,6 +46,26 @@ export function heroRing(i: number, cols: number, rows: number, out = 0): [numbe
     Math.ceil((heroHole.y + heroHole.h) * rows) + d,
   ];
 }
+
+/** A rect in fractions of the viewport. */
+export type ViewRect = { x: number; y: number; w: number; h: number };
+
+/**
+ * The scaling stage's mini loss chart (a DOM figure; on desktop it sits over
+ * the art box's bottom-right corner), in fractions of the viewport. Measured
+ * by ScalingSection (on resize, and as the zoom starts) and read by the
+ * scaling scene, so the brain is laid out clear of the chart and never paints
+ * under it.
+ *   rest — its rect resting in its corner (zoom 0)
+ *   zoom — its rect at full zoom, centred on the stage (zoom 1)
+ * Its rect at zoom z is exactly lerp(rest, zoom, z). The scene works out z
+ * and the chart's opacity from its own p (chartZoomAt / chartVisAt in
+ * scenes/scaling.ts: the zoom ScalingSection applies, the fade global.css
+ * applies), so the hole never lags the chart by a frame, whatever order the
+ * frame callbacks run in.
+ */
+export const chartHole: { rest: ViewRect | null; zoom: ViewRect | null } = { rest: null, zoom: null };
+
 /** WATCH phase: centred and large; the bottom strip is left for captions */
 const DESKTOP_FOCUS: Rect = [0.08, 0.075, 0.84, 0.72];
 /** mobile: the art always stays in the top band (no focus glide) */

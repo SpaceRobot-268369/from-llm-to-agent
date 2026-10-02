@@ -207,12 +207,14 @@ to each scene's beats.
 ### 1.2 · scaling-law ★ (headline card, then its own stage)
 
 - **Scene `scaling`:** pixels **fly in from every direction and converge
-  on the centre**, settling into the shape of a brain. The more pixels have
-  arrived (the bigger the model), the clearer the brain gets. No face. As it
-  grows, the brain also **lights up in colour**, fold by fold (blue, violet,
-  magenta, crimson, orange; the rim stays dark): a small model is plain ink,
-  the frontier brain a full multi-colour map — more colour, more
-  intelligence.
+  on the centre**, settling into the shape of a brain: a dark pixel brain,
+  two lobes cut by meandering folds. The more pixels have arrived (the bigger
+  the model), the clearer the brain gets. No face. As it grows, **sparks of
+  colour fire along its folds** like neurons (blue, violet, magenta): none
+  for GPT-1 and GPT-2, a handful by GPT-3, more and more at the frontier
+  (dots and tiny clusters, a few short paths), while most of the brain stays
+  ink — more sparks, more intelligence. The brain keeps clear of the mini
+  chart.
 - **Analogy:** Like a photo gaining pixels: the same picture, sharper at
   every step.
 - **Title:** Make it bigger. It gets better — predictably.

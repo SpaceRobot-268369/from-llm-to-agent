@@ -218,15 +218,20 @@ token, the retrieved pages, the agent's runner, the matched skill, the hidden
 system-prompt cards.
 
 **The one exception: vivid colour.** Where colour itself is the meaning —
-the scaling brain lighting up fold by fold as the model grows (more colour =
-more intelligence) — a scene tags ink cells with a slot of the fixed `VIVID`
-palette ([`color.ts`](../../../src/engine/color.ts)) through `Raster.col`.
-The hues are saturated mid-darks that stay legible on the scaling green and
-never read as ink; the brain's rim stays ink. The tag is cleared every frame
-and travels through the dissolve like the accent does, so scenes that never
-write it are unaffected. The halftone renderer draws one path per tone
-(`TONE_INK`, `TONE_ACC`, then `TONE_VIVID + k` in `halftone.ts`). `__scene`
-shows tagged cells as `1`–`5` (strong) / `a`–`e` (mid).
+sparks firing along the scaling brain's folds as the model grows (more
+sparks = more intelligence) — a scene tags ink cells with a slot of the
+fixed `VIVID` palette ([`color.ts`](../../../src/engine/color.ts)) through
+`Raster.col`. Colour stays sparse: dots, tiny clusters and a few short
+paths in the folds of an ink body (about 7% of the brain's cells at the
+frontier), never whole areas. The
+three hues — electric blue, violet, magenta — sit opposite the scaling green
+and stay legible on it, on the paper backgrounds and on the dark ink, so a
+coloured cell never reads as ink; warm hues are left out (muddy or invisible
+on the green). The tag is cleared every frame and travels through the
+dissolve like the accent does, so scenes that never write it are unaffected.
+The halftone renderer draws one path per tone (`TONE_INK`, `TONE_ACC`, then
+`TONE_VIVID + k` in `halftone.ts`). `__scene` shows tagged cells as `1`–`3`
+(strong) / `a`–`c` (mid).
 
 ## Scene
 

@@ -1,7 +1,8 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
 import { SCALING, type Section as SectionData } from '../content/sections';
+import { chartHole, type ViewRect } from '../engine/layout';
 import { lerp, range, smoothstep } from '../engine/noise';
-import { growth } from '../engine/scenes/scaling';
+import { chartZoomAt, growth } from '../engine/scenes/scaling';
 import { ticker } from '../engine/ticker';
 import { Formula } from './Formula';
 import { HeadlineCard } from './Section';
@@ -57,7 +58,19 @@ export function ScalingSection({ s, index }: { s: SectionData; index: number }) 
     // text and edges, instead of as an enlarged bitmap of the small chart.
     let S = 1;
     let geoKey = '';
-    const geo = { x: 0, y: 0, w: 0, h: 0, ox: 0, oy: 0, pw: 0, ph: 0 };
+    // layout box in the stage, transform origin, stage size; the stuck stage's
+    // viewport offset and the viewport size (for the engine's chartHole)
+    const geo = { x: 0, y: 0, w: 0, h: 0, ox: 0, oy: 0, pw: 0, ph: 0, sl: 0, st: 0, vw: 1, vh: 1 };
+    // the chart's visual rect for a scale s and translation (tx, ty), in viewport fractions
+    const rectAt = (s: number, tx: number, ty: number): ViewRect => {
+      const { x, y, w, h, ox, oy, sl, st, vw, vh } = geo;
+      return {
+        x: (sl + x + ox + tx - s * ox) / vw,
+        y: (st + y + oy + ty - s * oy) / vh,
+        w: (s * w) / vw,
+        h: (s * h) / vh,
+      };
+    };
     return ticker.onFrame((f) => {
       if (f.cur !== index && f.next !== index) return;
       const p = f.progress[index];
@@ -107,7 +120,7 @@ export function ScalingSection({ s, index }: { s: SectionData; index: number }) 
       // the ending: question fades → the chart zooms to the centre and holds →
       // the chart leaves → next topic. (Mobile shows the chart only for the zoom.)
       const chart = chartRef.current!;
-      const z = smoothstep(PH.chartZoom, PH.chartZoomEnd, p);
+      const z = chartZoomAt(p);
       const out = range(PH.chartOut, PH.chartOutEnd, p);
       // re-measured on resize, and as the zoom starts (late font loads may have moved it)
       const gk = `${f.vw}|${f.vh}|${f.mobile ? 1 : 0}|${z > 0 ? 1 : 0}`;
@@ -128,6 +141,16 @@ export function ScalingSection({ s, index }: { s: SectionData; index: number }) 
         geo.h = chart.offsetHeight;
         geo.ox = o[0] || 0;
         geo.oy = o[1] || 0;
+        // the stage is sticky: while the scene plays it is stuck at its CSS top
+        geo.sl = parent?.getBoundingClientRect().left ?? 0;
+        geo.st = parent ? parseFloat(getComputedStyle(parent).top) || 0 : 0;
+        geo.vw = document.documentElement.clientWidth || f.vw;
+        geo.vh = document.documentElement.clientHeight || f.vh;
+        // for the scene: where it rests (scale 1/S about its origin, no
+        // translation) and where it ends up at full zoom (scale 1, centred on
+        // the stage) — the zoom moves it linearly between the two
+        chartHole.rest = rectAt(1 / S, 0, 0);
+        chartHole.zoom = rectAt(1, geo.pw / 2 - geo.x - geo.w / 2, geo.ph / 2 - geo.y - geo.h / 2);
         geoKey = gk;
         lastZoom = '';
       }

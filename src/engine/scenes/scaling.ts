@@ -2,15 +2,23 @@
  * scaling — make it bigger, it gets better. Pixels fly in from every
  * direction and converge on the centre of the art box, where each one lands on
  * its own cell of a fixed target picture: a brain (two bumpy lobes, a centre
- * fissure, meandering folds). The more pixels have arrived — the bigger the
- * model — the clearer the brain gets.
+ * fissure, folds). The more pixels have arrived — the bigger the model — the
+ * clearer the brain gets.
  *
- * Colour = intelligence. Every fold of the brain (a patch between grooves)
- * owns one colour of the fixed vivid palette (Raster.col → VIVID). A small
- * model is plain ink; as the parameters grow, more incoming pixels arrive in
- * colour and more of the landed folds light up, fold by fold, until the
- * frontier brain is a full multi-colour map. The rim stays ink, so the
- * silhouette holds on any background.
+ * The brain reads as a brain first: a solid ink silhouette (two bumpy lobes,
+ * the fissure between them) cut by 1-cell meandering grooves — its folds,
+ * different in each lobe, kept off the outline so the silhouette stays
+ * whole, and ending short of the fissure so the midline stays one clean
+ * line. While it builds, the halftone ghost shows the picture to come.
+ *
+ * Colour = intelligence, used sparingly. Sparks of the vivid palette
+ * (Raster.col → VIVID: blue, violet, magenta) fire along the folds, like
+ * neurons: none at GPT-1 / GPT-2, a handful of single cells by GPT-3, then
+ * more and more sparks, each a dot or a tiny cluster along its fold (a few
+ * run on into a short path) — at most SPARK_MAX of the brain's cells at the
+ * frontier; the body stays ink.
+ * A spark kindles as a small dot, then breathes slowly with t (a soft wave
+ * running out from where it started).
  *
  * p is the RAW section progress (the scaling stage keeps its own timeline,
  * SCALING.phases):
@@ -23,7 +31,8 @@
  *                       border on the ray through its target, flies in
  *                       (decelerating, paper-white accent with a short streak),
  *                       lands with a brief white glint, then settles to ink.
- *                       The ghost fades as the real pixels take over.
+ *                       The ghost fades as the real pixels take over; a spark
+ *                       fires in a fold once a cell beside it has landed.
  *   growEnd … copyOut   hold: the finished brain
  *   copyOut …           unclipped (no copy column any more): the brain
  *                       drifts to the centre of the screen and erodes cell
@@ -33,20 +42,34 @@
  *   chartZoom … chartZoomEnd  the fog dissolves — the DOM chart takes over;
  *                       nothing is painted after that
  *
+ * The mini loss chart (DOM, layout.chartHole): the brain is laid out clear of
+ * the chart's resting rect, and nothing is painted under the chart's current
+ * rect while it is visible.
+ *
  * t only drives ambient motion: a trickle of incoming specks while the brain
- * is unfinished.
- * At t = 0 every frame reads.
+ * is unfinished, and the sparks' slow breathing. At t = 0 every frame reads.
  */
 import { SCALING } from '../../content/sections';
 import { VIVID } from '../color';
+import { chartHole, type ViewRect } from '../layout';
 import type { Raster } from '../raster';
 import { clamp, easeInOut, hash2, lerp, range, smoothstep } from '../noise';
 import type { Box, Scene } from './types';
 
-const { growStart, growEnd, copyOut, questionStart, questionEnd, chartZoom, chartZoomEnd } = SCALING.phases;
+const { growStart, growEnd, copyOut, questionStart, questionEnd, chartZoom, chartZoomEnd, chartOut, chartOutEnd } = SCALING.phases;
 
 /** growth 0..1 across the milestones (ScalingSection drives its counters with it) */
 export const growth = (p: number) => range(growStart, growEnd, p);
+
+/** the mini chart's zoom 0..1 at p (ScalingSection drives the chart with it) */
+export const chartZoomAt = (p: number) => smoothstep(chartZoom, chartZoomEnd, p);
+
+/**
+ * The mini chart's opacity at p, as in global.css (.scaling__chart): in with
+ * the growth on desktop, with the zoom on mobile; out with the exit.
+ */
+export const chartVisAt = (p: number, mobile: boolean) =>
+  (mobile ? range(chartZoom, chartZoom + 0.03, p) : range(growStart, growStart + 0.04, p)) * (1 - range(chartOut, chartOutEnd, p));
 
 /** fraction of the brain already landed before growth starts */
 const SEED = 0.05;
@@ -63,11 +86,28 @@ const BIAS = 0.25;
 /** ghost of the picture to come: its outline (uniform small squares) and its body */
 const GHOST_EDGE = 0.5;
 const GHOST_BODY = 0.12;
-/** colourfulness ramps over this span of growth (milestone 1 → frontier), eased in */
-const COLOR_FROM = 0.1;
-const COLOR_TO = 0.96;
-/** how much a fold lights up as one piece (vs cell by cell) */
-const COLOR_GROUP = 0.6;
+
+// ── sparks (colour = intelligence) ──
+/** growth at which the first spark kindles (GPT-2 → GPT-3) */
+const SPARK_FROM = 0.18;
+/** share of the brain's cells in colour at the frontier */
+const SPARK_MAX = 0.075;
+/** how the share ramps up from SPARK_FROM to the frontier (> 1 = slow start) */
+const SPARK_POW = 1.3;
+/** cells between spark starts along the folds; how far (cells) a spark runs on along its fold — most stay a tiny cluster, a few become a short path */
+const SPARK_GAP = 7;
+const SPARK_SPAN = 1;
+const SPARK_LONG = 2;
+const SPARK_LONG_SHARE = 0.3;
+/** delay per cell as a spark runs along its fold (in start-time units, 0..1) */
+const SPARK_RUN = 0.09;
+/** a spark cell grows from a small dot to full over this many cells of the count */
+const SPARK_KINDLE = 2.5;
+/** breathing: depth (share of the value), period range in seconds, wave length in cells */
+const TWINKLE = 0.26;
+const TW_MIN = 3.6;
+const TW_MAX = 6.4;
+const TW_WAVE = 3;
 /** number of vivid colour slots used (VIVID in color.ts) */
 const SLOTS = VIVID.length;
 
@@ -85,13 +125,28 @@ const BUMP = 0.045;
 const BUMPS = 11;
 /** the fissure runs from the top down to this depth */
 const FISSURE = 0.6;
-/** folds: zero set of a narrow-band random wave field (wavenumber per cell) */
+/** no fold within this many cells of the fissure, so no groove runs alongside it */
+const MIDLINE = 2;
+/** folds: zero set of a narrow-band random wave field — wavenumber per cell for a brain WAVE_A cells wide (half); ∝ 1/√size */
 const WAVES = 11;
-const WAVE_K = 0.66;
-const WAVE_SEED = 13;
+const WAVE_K = 0.6;
+const WAVE_A = 25;
+const WAVE_SEED = 29;
+/** brain extents in brain space (half-width, half-height), with the bumps */
+const EXT_X = (LOBE_X + LOBE_RX) * (1 + BUMP);
+const EXT_Y = LOBE_RY * (1 + BUMP);
+
+// ── the mini chart ──
+/** cells of air kept between the brain and the chart's resting rect */
+const CHART_AIR = 1.5;
+/** brain fit around the chart: smallest scale tried, and its step */
+const FIT_MIN = 0.6;
+const FIT_STEP = 0.025;
 
 type Brain = {
+  /** layout key (box, mobile) and the chart-hole key it was laid out around */
   key: string;
+  hk: string;
   /** semi-axes, cells */
   a: number;
   b: number;
@@ -110,17 +165,24 @@ type Brain = {
   gw: number;
   gh: number;
   grid: Uint8Array;
-  /** per grid cell: vivid colour slot (0 = stays ink: the rim) and the colourfulness at which it lights up */
+  /** per grid cell: spark order (−1 = never a spark), colour slot, breathing phase (cycles) and period (s) */
+  rank: Int32Array;
   slot: Uint8Array;
-  hue: Float32Array;
-  /** per particle: its grid cell */
-  cell: Int32Array;
-  /** the brain sits this many cells above the box centre (clears the DOM chart) */
-  lift: number;
+  phase: Float32Array;
+  period: Float32Array;
+  /** spark cells (fold cells) in firing order, and the arrival after which each may fire */
+  spark: Int32Array;
+  ready: Float32Array;
+  /** the brain's centre, cells from the box centre (up / left to clear the chart) */
+  ox: number;
+  oy: number;
   /** box half extents, cells */
   hw: number;
   hh: number;
 };
+
+/** a rect in grid cells, half-open */
+type Cells = { x0: number; y0: number; x1: number; y1: number };
 
 let CACHE: Brain | null = null;
 
@@ -135,82 +197,153 @@ function lobeDist(nx: number, ny: number): number {
   return Math.min(dl, db);
 }
 
-/** Distance from the brain centre (lift above the box centre) to the box border along (c, s). */
-function toBorder(c: number, s: number, hw: number, hh: number, lift: number): number {
-  const ex = Math.abs(c) > 1e-6 ? hw / Math.abs(c) : 1e9;
-  const ey = s > 1e-6 ? (hh + lift) / s : s < -1e-6 ? (hh - lift) / -s : 1e9;
+/** The fissure's column (cells from the brain centre) in row dy: a gentle wave. */
+const fissureAt = (dy: number) => Math.round(0.7 * Math.sin(dy * 0.33 + 0.5));
+
+/** Distance from the brain centre (ox, oy from the box centre) to the box border along (c, s). */
+function toBorder(c: number, s: number, hw: number, hh: number, ox: number, oy: number): number {
+  const ex = c > 1e-6 ? (hw - ox) / c : c < -1e-6 ? (hw + ox) / -c : 1e9;
+  const ey = s > 1e-6 ? (hh - oy) / s : s < -1e-6 ? (hh + oy) / -s : 1e9;
   return Math.min(ex, ey);
 }
 
-function build(box: Box, mobile: boolean, key: string): Brain {
-  const a = Math.max(8, Math.min(box.w * SIZE, box.h * 0.46));
+/** A viewport-fraction rect → grid cells, grown by `pad` cells (the grid spans the viewport). */
+function toCells(v: ViewRect, full: Box, pad: number): Cells {
+  return {
+    x0: Math.floor(v.x * full.w - pad),
+    y0: Math.floor(v.y * full.h - pad),
+    x1: Math.ceil((v.x + v.w) * full.w + pad),
+    y1: Math.ceil((v.y + v.h) * full.h + pad),
+  };
+}
+
+/** True when a brain of half-width a centred on cell (cx, cy) keeps out of `h`. */
+function clears(cx: number, cy: number, a: number, h: Cells): boolean {
   const b = a * ASPECT;
+  for (let y = h.y0; y < h.y1; y++) {
+    const dy = y - cy;
+    if (Math.abs(dy) > EXT_Y * b + 1) continue;
+    for (let x = h.x0; x < h.x1; x++) {
+      const dx = x - cx;
+      if (Math.abs(dx) > EXT_X * a + 1) continue;
+      if (lobeDist(dx / a, dy / b) < 1) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Size and place the brain so it keeps clear of the chart's resting rect:
+ * the full size if a small nudge up / left (staying inside the box) clears
+ * it, else a little smaller, and so on.
+ */
+function fit(box: Box, a0: number, oy0: number, hole: Cells | null): { a: number; ox: number; oy: number } {
+  if (!hole) return { a: a0, ox: 0, oy: oy0 };
+  for (let s = 1; s >= FIT_MIN - 1e-6; s -= FIT_STEP) {
+    const a = a0 * s;
+    const maxL = Math.max(0, Math.floor(box.w / 2 - EXT_X * a - 1));
+    const maxU = Math.max(0, Math.floor(box.h / 2 + oy0 - EXT_Y * a * ASPECT - 1));
+    const shifts: [number, number][] = [];
+    for (let dx = 0; dx <= maxL; dx++) for (let dy = 0; dy <= maxU; dy++) shifts.push([dx, dy]);
+    // smallest nudge first; up is cheaper than sideways (keeps it centred in the box)
+    shifts.sort((p, q) => 1.6 * p[0] * p[0] + p[1] * p[1] - (1.6 * q[0] * q[0] + q[1] * q[1]));
+    for (const [dx, dy] of shifts) {
+      if (clears(Math.round(box.cx) - dx, Math.round(box.cy + oy0) - dy, a, hole)) return { a, ox: -dx, oy: oy0 - dy };
+    }
+  }
+  return { a: a0 * FIT_MIN, ox: 0, oy: oy0 };
+}
+
+function build(box: Box, mobile: boolean, hole: Cells | null, key: string, hk: string): Brain {
+  const a0 = Math.max(8, Math.min(box.w * SIZE, box.h * 0.46));
   const lift = mobile ? 0 : Math.round(box.h * 0.035);
+  const { a, ox, oy } = fit(box, a0, -lift, hole);
+  const b = a * ASPECT;
   const hw = box.w / 2 - 1;
   const hh = box.h / 2 - 1;
   const gx = -(Math.ceil(a) + 2);
   const gy = -(Math.ceil(b) + 2);
   const gw = -gx * 2 + 1;
   const gh = -gy * 2 + 1;
+  const N = gw * gh;
 
   // inside mask; the fissure is a 1-cell wavy gap from the top down
-  const inside = new Uint8Array(gw * gh);
+  const inside = new Uint8Array(N);
   for (let j = 0; j < gh; j++) {
     const dy = gy + j;
-    const fis = Math.round(0.7 * Math.sin(dy * 0.33 + 0.5));
+    const fis = fissureAt(dy);
     for (let i = 0; i < gw; i++) {
       const dx = gx + i;
       if (dx === fis && dy / b < FISSURE) continue;
       if (lobeDist(dx / a, dy / b) < 1) inside[j * gw + i] = 1;
     }
   }
-  // folds: the sign of a narrow-band random wave field (a sum of equal-length
-  // waves in random directions) — its zero set is a labyrinth of meandering
-  // lines, the look of brain folds. Mirrored, so the lobes echo each other.
+  const isIn = (i: number, j: number) => i >= 0 && j >= 0 && i < gw && j < gh && inside[j * gw + i] === 1;
+  const deep = (c: number) => {
+    const i = c % gw;
+    const j = (c / gw) | 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) if (!isIn(i + di, j + dj)) return false;
+    return true;
+  };
+  // folds: where a narrow-band random wave field (a sum of equal-length
+  // waves in random directions) changes sign — its zero set is a labyrinth of
+  // meandering lines, the look of brain folds. Not mirrored: each lobe folds
+  // its own way. The folds widen a little with the brain (not in step), so
+  // a big screen shows a brain with roomier folds, not a busier one.
+  const kw = WAVE_K * Math.sqrt(WAVE_A / a);
   const wc = new Float32Array(WAVES);
   const ws = new Float32Array(WAVES);
   const wp = new Float32Array(WAVES);
   for (let q = 0; q < WAVES; q++) {
     const th = (q / WAVES) * Math.PI + (hash2(q, 1, WAVE_SEED) - 0.5) * 0.6;
-    wc[q] = Math.cos(th) * WAVE_K;
-    ws[q] = Math.sin(th) * WAVE_K;
+    wc[q] = Math.cos(th) * kw;
+    ws[q] = Math.sin(th) * kw;
     wp[q] = hash2(q, 2, WAVE_SEED) * Math.PI * 2;
   }
-  const side = new Uint8Array(gw * gh);
+  const side = new Uint8Array(N);
   for (let j = 0; j < gh; j++) {
     const Y = gy + j + 1.3;
     for (let i = 0; i < gw; i++) {
-      const X = Math.abs(gx + i) + 3.1;
+      const X = gx + i + 3.1;
       let w = 0;
       for (let q = 0; q < WAVES; q++) w += Math.cos(X * wc[q] + Y * ws[q] + wp[q]);
       side[j * gw + i] = w > 0 ? 1 : 0;
     }
   }
-  // target: a solid 1-cell rim, solid mass, 1-cell grooves where the fold
-  // field changes sign across a cell edge
-  const grid = new Uint8Array(gw * gh);
-  const rims = new Uint8Array(gw * gh);
-  const out = (i: number, j: number) => i < 0 || j < 0 || i >= gw || j >= gh || !inside[j * gw + i];
-  for (let j = 0; j < gh; j++) {
-    for (let i = 0; i < gw; i++) {
+  // a fold cell is where the sign flips across its right or lower edge; it
+  // keeps a whole ring of brain around it, so the outline and the fissure
+  // stay unbroken, and it keeps off the fissure's sides, so the folds end at
+  // the midline instead of doubling it
+  const fold = new Uint8Array(N);
+  for (let j = 0; j < gh - 1; j++) {
+    const dy = gy + j;
+    const fis = fissureAt(dy);
+    const mid = dy / b < FISSURE + 0.08;
+    for (let i = 0; i < gw - 1; i++) {
       const idx = j * gw + i;
-      if (!inside[idx]) continue;
-      const rim = out(i - 1, j) || out(i + 1, j) || out(i, j - 1) || out(i, j + 1);
-      const groove =
-        !rim &&
-        ((inside[idx + 1] && side[idx + 1] !== side[idx]) || (inside[idx + gw] && side[idx + gw] !== side[idx]));
-      if (!groove) grid[idx] = 1;
-      if (rim) rims[idx] = 1;
+      if (mid && Math.abs(gx + i - fis) <= MIDLINE) continue;
+      if (side[idx + 1] !== side[idx] || side[idx + gw] !== side[idx]) fold[idx] = deep(idx) ? 1 : 0;
     }
   }
 
-  const { slot, hue } = colourFolds(grid, rims, inside, gw, gh);
+  // target: everything inside but the folds; the rim (next to the outside or
+  // the fissure) is the ghost's outline
+  const grid = new Uint8Array(N);
+  const rims = new Uint8Array(N);
+  for (let j = 0; j < gh; j++) {
+    for (let i = 0; i < gw; i++) {
+      const idx = j * gw + i;
+      if (!inside[idx] || fold[idx]) continue;
+      grid[idx] = 1;
+      if (!isIn(i - 1, j) || !isIn(i + 1, j) || !isIn(i, j - 1) || !isIn(i, j + 1)) rims[idx] = 1;
+    }
+  }
 
   // particles, one per inked target cell; arrival order mostly random (so the
   // whole picture sharpens at once, like a photo gaining pixels) with a mild
   // centre-first bias, so the seed sits in the middle
   const cells: number[] = [];
-  for (let idx = 0; idx < grid.length; idx++) if (grid[idx]) cells.push(idx);
+  for (let idx = 0; idx < N; idx++) if (grid[idx]) cells.push(idx);
   const n = cells.length;
   const raw = new Float32Array(n);
   for (let q = 0; q < n; q++) {
@@ -225,107 +358,124 @@ function build(box: Box, mobile: boolean, key: string): Brain {
   const edge = new Uint8Array(n);
   const sx = new Float32Array(n);
   const sy = new Float32Array(n);
-  const cell = new Int32Array(n);
+  const kAt = new Float32Array(N);
   const seedN = Math.round(n * SEED);
-  for (let rank = 0; rank < n; rank++) {
-    const idx = cells[order[rank]];
+  for (let r = 0; r < n; r++) {
+    const idx = cells[order[r]];
     const i = idx % gw;
     const j = (idx / gw) | 0;
     const dx = gx + i;
     const dy = gy + j;
-    tx[rank] = dx;
-    ty[rank] = dy;
-    edge[rank] = rims[idx];
-    cell[rank] = idx;
+    tx[r] = dx;
+    ty[r] = dy;
+    edge[r] = rims[idx];
     // seed pixels are there from the start; the rest arrive evenly over A
-    k[rank] =
-      rank < seedN ? (rank / seedN) * SEED : SEED + FLIGHT + ((rank - seedN) / Math.max(1, n - seedN)) * (1 - SEED - FLIGHT);
+    k[r] = r < seedN ? (r / seedN) * SEED : SEED + FLIGHT + ((r - seedN) / Math.max(1, n - seedN)) * (1 - SEED - FLIGHT);
+    kAt[idx] = k[r];
     // flight starts near the box border, on (roughly) the ray from the centre through the target
     const th = Math.atan2(dy, dx) + (hash2(i, j, 23) - 0.5) * 0.5;
     const c = Math.cos(th);
     const s = Math.sin(th);
-    const D = toBorder(c, s, hw, hh, lift) * (0.9 + 0.1 * hash2(i, j, 29));
-    sx[rank] = c * D;
-    sy[rank] = s * D;
+    const D = toBorder(c, s, hw, hh, ox, oy) * (0.9 + 0.1 * hash2(i, j, 29));
+    sx[r] = c * D;
+    sy[r] = s * D;
   }
 
-  return { key, a, b, n, tx, ty, k, edge, sx, sy, gx, gy, gw, gh, grid, slot, hue, cell, lift, hw, hh };
+  const sp = sparks(fold, grid, gw, gh, N, kAt);
+  return { key, hk, a, b, n, tx, ty, k, edge, sx, sy, gx, gy, gw, gh, grid, ...sp, ox, oy, hw, hh };
 }
 
 /**
- * Give every fold its colour. Folds are the 4-connected patches of inked,
- * non-rim cells (grooves separate them). Greedy colouring keeps folds that
- * face each other across a groove in different colours. Each cell's `hue` is
- * the colourfulness at which it lights up: mostly its fold's (so folds light
- * up as pieces), partly its own (a ragged pixel front inside the fold).
+ * Where and when the sparks fire. Spark starts sit on the fold cells about
+ * SPARK_GAP apart (hashed), each with a hashed start time; a spark runs on
+ * along its fold (8-connected) SPARK_SPAN cells each way (SPARK_LONG for
+ * SPARK_LONG_SHARE of them), one cell per SPARK_RUN of time — so the first
+ * sparks are single cells and later ones grow into tiny clusters, a few
+ * into short paths, with dark gaps left between them. Each spark keeps
+ * one colour, and breathes as a wave out from its start. A fold cell may
+ * fire once a brain cell beside it has landed (`ready`).
  */
-function colourFolds(grid: Uint8Array, rims: Uint8Array, inside: Uint8Array, gw: number, gh: number) {
-  const N = gw * gh;
-  const label = new Int32Array(N).fill(-1);
-  const queue = new Int32Array(N);
-  let folds = 0;
-  for (let s0 = 0; s0 < N; s0++) {
-    if (!grid[s0] || rims[s0] || label[s0] >= 0) continue;
-    let head = 0;
-    let tail = 0;
-    queue[tail++] = s0;
-    label[s0] = folds;
-    while (head < tail) {
-      const c = queue[head++];
-      const i = c % gw;
-      const nb = [i > 0 ? c - 1 : -1, i < gw - 1 ? c + 1 : -1, c - gw, c + gw];
-      for (const d of nb) {
-        if (d < 0 || d >= N || !grid[d] || rims[d] || label[d] >= 0) continue;
-        label[d] = folds;
-        queue[tail++] = d;
-      }
-    }
-    folds++;
-  }
-  // folds that meet across a groove cell are neighbours
-  const near: Set<number>[] = Array.from({ length: folds }, () => new Set<number>());
-  for (let c = 0; c < N; c++) {
-    if (!inside[c] || grid[c]) continue;
+function sparks(fold: Uint8Array, grid: Uint8Array, gw: number, gh: number, N: number, kAt: Float32Array) {
+  const rank = new Int32Array(N).fill(-1);
+  const slot = new Uint8Array(N);
+  const phase = new Float32Array(N);
+  const period = new Float32Array(N);
+  const when = new Float32Array(N);
+  const cells: number[] = [];
+  for (let c = 0; c < N; c++) if (fold[c]) cells.push(c);
+  // starts: in hashed order, each at least ~0.7 SPARK_GAP from the others
+  const order = cells.slice().sort((x, y) => hash2(x, 0, 51) - hash2(y, 0, 51));
+  const starts: number[] = [];
+  const sep = (0.7 * SPARK_GAP) ** 2;
+  for (const c of order) {
     const i = c % gw;
-    const ids: number[] = [];
+    const j = (c / gw) | 0;
+    if (starts.every((o) => ((o % gw) - i) ** 2 + (((o / gw) | 0) - j) ** 2 >= sep)) starts.push(c);
+  }
+  // run along the folds from every start at once
+  const from = new Int32Array(N).fill(-1);
+  const dist = new Uint8Array(N);
+  const queue = new Int32Array(N);
+  const span = starts.map((_, s) => (hash2(s, 6, 67) < SPARK_LONG_SHARE ? SPARK_LONG : SPARK_SPAN));
+  let head = 0;
+  let tail = 0;
+  starts.forEach((c, s) => {
+    from[c] = s;
+    queue[tail++] = c;
+  });
+  while (head < tail) {
+    const c = queue[head++];
+    if (dist[c] >= span[from[c]]) continue;
+    const i = c % gw;
+    const j = (c / gw) | 0;
     for (let dj = -1; dj <= 1; dj++) {
       for (let di = -1; di <= 1; di++) {
         const ii = i + di;
-        const d = c + dj * gw + di;
-        if (ii < 0 || ii >= gw || d < 0 || d >= N || label[d] < 0) continue;
-        if (!ids.includes(label[d])) ids.push(label[d]);
+        const jj = j + dj;
+        if (ii < 0 || jj < 0 || ii >= gw || jj >= gh) continue;
+        const d = jj * gw + ii;
+        if (!fold[d] || from[d] >= 0) continue;
+        from[d] = from[c];
+        dist[d] = dist[c] + 1;
+        queue[tail++] = d;
       }
     }
-    for (const x of ids) for (const y of ids) if (x !== y) near[x].add(y);
   }
-  const colour = new Int8Array(folds).fill(-1);
-  for (let f = 0; f < folds; f++) {
-    const start = Math.floor(hash2(f, 1, 71) * SLOTS);
-    let pick = start;
-    for (let o = 0; o < SLOTS; o++) {
-      const c = (start + o) % SLOTS;
-      let clash = false;
-      for (const g of near[f]) if (colour[g] === c) clash = true;
-      if (!clash) {
-        pick = c;
-        break;
+  const sites: number[] = [];
+  for (const c of cells) {
+    const s = from[c];
+    if (s < 0) continue;
+    const d = dist[c];
+    sites.push(c);
+    when[c] = hash2(s, 1, 57) + d * SPARK_RUN + hash2(c, 2, 59) * 0.01;
+    slot[c] = 1 + Math.min(SLOTS - 1, Math.floor(hash2(s, 3, 61) * SLOTS));
+    period[c] = lerp(TW_MIN, TW_MAX, hash2(s, 4, 63));
+    phase[c] = hash2(s, 5, 65) - d / TW_WAVE;
+  }
+  sites.sort((x, y) => when[x] - when[y]);
+  const spark = Int32Array.from(sites);
+  const ready = new Float32Array(spark.length);
+  for (let r = 0; r < spark.length; r++) {
+    const c = spark[r];
+    rank[c] = r;
+    // once a brain cell beside it has landed
+    const i = c % gw;
+    const j = (c / gw) | 0;
+    let k1 = 2;
+    for (let dj = -1; dj <= 1; dj++) {
+      for (let di = -1; di <= 1; di++) {
+        const ii = i + di;
+        const jj = j + dj;
+        if (ii >= 0 && jj >= 0 && ii < gw && jj < gh && grid[jj * gw + ii]) k1 = Math.min(k1, kAt[jj * gw + ii]);
       }
     }
-    colour[f] = pick;
+    ready[r] = k1 + GLINT;
   }
-  const slot = new Uint8Array(N);
-  const hue = new Float32Array(N);
-  for (let c = 0; c < N; c++) {
-    const f = label[c];
-    if (f < 0) continue;
-    slot[c] = colour[f] + 1;
-    hue[c] = COLOR_GROUP * hash2(f, 2, 73) + (1 - COLOR_GROUP) * hash2(c % gw, (c / gw) | 0, 79);
-  }
-  return { slot, hue };
+  return { rank, slot, phase, period, spark, ready };
 }
 
-/** colourfulness 0..1 at growth g: plain ink at the first milestone, a full colour map at the frontier */
-const colourful = (g: number) => smoothstep(COLOR_FROM, COLOR_TO, g) ** 1.25;
+/** sparks lit at growth g (a float count of cells, in firing order): none before SPARK_FROM, SPARK_MAX of the brain at the frontier */
+const lit = (g: number, n: number, max: number) => Math.min(max, SPARK_MAX * n * range(SPARK_FROM, 1, g) ** SPARK_POW);
 
 /** max-blend one cell; an ink write with a colour slot also tags the cell's colour */
 function put(r: Raster, x: number, y: number, val: number, acc: boolean, slot = 0) {
@@ -338,37 +488,50 @@ function put(r: Raster, x: number, y: number, val: number, acc: boolean, slot = 
   }
 }
 
-/** overwrite one cell (things drawn on top of the brain) */
-function over(r: Raster, x: number, y: number, ink: number, acc: number, slot = 0) {
-  if (x < 0 || y < 0 || x >= r.w || y >= r.h) return;
-  const i = y * r.w + x;
-  r.ink[i] = ink;
-  r.acc[i] = acc;
-  r.col[i] = slot;
-}
-
 /**
  * A flying pixel: a head at (hx, hy) and a fading streak back toward (bx, by),
- * in paper-white accent — or, with a colour slot, in that vivid colour.
+ * in paper-white accent.
  */
-function streak(r: Raster, hx: number, hy: number, bx: number, by: number, alpha: number, solidHead: boolean, slot = 0) {
+function streak(r: Raster, hx: number, hy: number, bx: number, by: number, alpha: number, solidHead: boolean) {
   const dx = bx - hx;
   const dy = by - hy;
   const d = Math.hypot(dx, dy);
   const len = Math.min(STREAK, d);
-  const acc = slot === 0;
   for (let s = 1; s <= len; s++) {
     const fall = 1 - (s - 1) / STREAK;
-    put(r, Math.round(hx + (dx / d) * s), Math.round(hy + (dy / d) * s), alpha * (0.3 + 0.5 * fall), acc, slot);
+    put(r, Math.round(hx + (dx / d) * s), Math.round(hy + (dy / d) * s), alpha * (0.3 + 0.5 * fall), true);
   }
   // the head shows even over landed ink, so the pixel visibly reaches its cell
   const x = Math.round(hx);
   const y = Math.round(hy);
-  if (solidHead) {
-    if (acc) over(r, x, y, 0, alpha);
-    else over(r, x, y, alpha, 0, slot);
-  } else put(r, x, y, alpha, acc, slot);
+  if (solidHead && x >= 0 && y >= 0 && x < r.w && y < r.h) {
+    const i = y * r.w + x;
+    r.ink[i] = 0;
+    r.acc[i] = alpha;
+    r.col[i] = 0;
+  } else put(r, x, y, alpha, true);
 }
+
+/**
+ * Clear every cell under the chart (viewport fractions → cells, touching
+ * cells included) — or, while the chart fades in, fade them out in step.
+ */
+function unpaint(r: Raster, v: ViewRect, vis: number, full: Box) {
+  const h = toCells(v, full, 0.5);
+  const keep = vis >= 0.999 ? 0 : 1 - vis;
+  const x0 = Math.max(0, h.x0);
+  const x1 = Math.min(r.w, h.x1);
+  for (let y = Math.max(0, h.y0); y < Math.min(r.h, h.y1); y++) {
+    for (let x = x0; x < x1; x++) {
+      const i = y * r.w + x;
+      r.ink[i] *= keep;
+      r.acc[i] *= keep;
+      if (!keep) r.col[i] = 0;
+    }
+  }
+}
+
+const TAU = Math.PI * 2;
 
 const scene: Scene = {
   // the copy column has left: the brain may drift to the centre of the screen
@@ -376,63 +539,79 @@ const scene: Scene = {
 
   paint({ r, box, full, p, t, mobile }) {
     if (p >= chartZoomEnd) return;
-    const key = `${Math.round(box.w * 4)}:${Math.round(box.h * 4)}:${mobile ? 1 : 0}`;
-    if (!CACHE || CACHE.key !== key) CACHE = build(box, mobile, key);
+    // mobile shows the chart only for the closing zoom: no corner to keep clear
+    const hole = chartHole.rest && !mobile ? toCells(chartHole.rest, full, CHART_AIR) : null;
+    const hk = hole ? `${hole.x0},${hole.y0},${hole.x1},${hole.y1}` : '-';
+    const key = `${Math.round(box.w * 4)}:${Math.round(box.h * 4)}:${Math.round(box.x * 4)}:${Math.round(box.y * 4)}:${mobile ? 1 : 0}`;
+    // a re-measured chart (it is measured again as the zoom starts) only
+    // re-lays the brain while it still sits in its box — never mid-fog
+    if (!CACHE || CACHE.key !== key || (CACHE.hk !== hk && p < copyOut)) CACHE = build(box, mobile, hole, key, hk);
     const B = CACHE;
+    const { gx, gy, gw, rank, slot, phase, period, spark, ready } = B;
 
     const g = growth(p);
     // arrival front: SEED → 1 (+ the last glint) over the growth
     const A = SEED + (1 + GLINT - SEED) * clamp(g / 0.97);
-    // colour: how far the brain has lit up (cells with hue < C are in colour)
-    const C = colourful(g);
+    // sparks lit so far (fold cells with rank < S fire)
+    const S = lit(g, B.n, spark.length);
 
     // ending beats
     const drift = easeInOut(range(copyOut + 0.005, questionStart + 0.06, p));
     const erode = easeInOut(range(questionStart - 0.01, questionEnd - 0.03, p));
     const fade = 1 - range(chartZoom, chartZoomEnd, p);
 
-    const cx = Math.round(lerp(box.cx, full.cx, drift));
-    const cy = Math.round(lerp(box.cy - B.lift, full.cy, drift));
+    const cx = Math.round(lerp(box.cx + B.ox, full.cx, drift));
+    const cy = Math.round(lerp(box.cy + B.oy, full.cy, drift));
 
     // ── the brain ────────────────────────────────────────────────────────
     if (erode > 0) {
       // the finished brain, a little larger, eroding into a light fog. Each
       // cell drops out or steps down the halftone levels (1 → ¾ → ½ → ¼, all
       // exact levels, so no dither churn) at its own hashed moment — a clean
-      // dissolve. The chart's zoom then dissolves the rest.
+      // dissolve. Sparks keep their colour. The chart's zoom then dissolves
+      // the rest.
       const sc = 1 + 0.3 * erode;
       const gone = 0.5 * erode + 0.5 * (1 - fade);
-      const x0 = Math.max(0, Math.floor(cx + B.gx * sc));
-      const x1 = Math.min(r.w, Math.ceil(cx + (B.gx + B.gw) * sc));
-      const y0 = Math.max(0, Math.floor(cy + B.gy * sc));
-      const y1 = Math.min(r.h, Math.ceil(cy + (B.gy + B.gh) * sc));
+      const x0 = Math.max(0, Math.floor(cx + gx * sc));
+      const x1 = Math.min(r.w, Math.ceil(cx + (gx + gw) * sc));
+      const y0 = Math.max(0, Math.floor(cy + gy * sc));
+      const y1 = Math.min(r.h, Math.ceil(cy + (gy + B.gh) * sc));
       for (let y = y0; y < y1; y++) {
-        const j = Math.round((y - cy) / sc) - B.gy;
+        const j = Math.round((y - cy) / sc) - gy;
         if (j < 0 || j >= B.gh) continue;
         for (let x = x0; x < x1; x++) {
-          const i = Math.round((x - cx) / sc) - B.gx;
-          const gi = j * B.gw + i;
-          if (i < 0 || i >= B.gw || !B.grid[gi]) continue;
+          const i = Math.round((x - cx) / sc) - gx;
+          if (i < 0 || i >= gw) continue;
+          const gi = j * gw + i;
+          const on = rank[gi] >= 0 && rank[gi] < S;
+          if (!B.grid[gi] && !on) continue;
           if (hash2(i, j, 41) < gone) continue;
           const step = Math.floor(erode * 3.9 - hash2(i, j, 43) * 0.9);
-          put(r, x, y, step <= 0 ? 1 : step === 1 ? 0.75 : step === 2 ? 0.5 : 0.25, false, B.hue[gi] < C ? B.slot[gi] : 0);
+          put(r, x, y, step <= 0 ? 1 : step === 1 ? 0.75 : step === 2 ? 0.5 : 0.25, false, on ? slot[gi] : 0);
         }
       }
     } else {
       // a ghost of the picture to come (a fine-dot outline over a faint
-      // body); landed pixels glint, then ink
+      // body); landed pixels glint, then settle to ink
       const ghost = 1 - smoothstep(0.3, 0.85, g);
-      const { n, tx, ty, k, edge, sx, sy, slot, hue, cell } = B;
+      const { n, tx, ty, k, edge, sx, sy } = B;
       for (let q = 0; q < n; q++) {
         const kq = k[q];
         const x = cx + tx[q];
         const y = cy + ty[q];
-        if (A >= kq) {
-          if (kq >= SEED && A - kq < GLINT) put(r, x, y, 1, true);
-          else put(r, x, y, 1, false, hue[cell[q]] < C ? slot[cell[q]] : 0);
-        } else if (ghost > 0) {
-          put(r, x, y, (edge[q] ? GHOST_EDGE : GHOST_BODY) * ghost, false);
-        }
+        if (A >= kq) put(r, x, y, 1, kq >= SEED && A - kq < GLINT);
+        else if (ghost > 0) put(r, x, y, (edge[q] ? GHOST_EDGE : GHOST_BODY) * ghost, false);
+      }
+      // sparks fire in the folds: each kindles as a small dot, then breathes
+      // (a slow wave out from where it started)
+      const top = Math.ceil(S);
+      for (let q = 0; q < top; q++) {
+        if (A < ready[q]) continue;
+        const gi = spark[q];
+        const kin = Math.min(1, (S - q) / SPARK_KINDLE);
+        const tw = 0.5 + 0.5 * Math.cos(TAU * (t / period[gi] + phase[gi]));
+        const v = (0.45 + 0.55 * kin) * (1 - TWINKLE * (1 - tw));
+        put(r, cx + gx + (gi % gw), cy + gy + ((gi / gw) | 0), v, false, slot[gi]);
       }
       // in flight: from the border toward the target, decelerating
       for (let q = 0; q < n; q++) {
@@ -449,7 +628,6 @@ const scene: Scene = {
           cy + lerp(sy[q], ty[q], eb),
           0.45 + 0.55 * smoothstep(0, 0.18, f),
           true,
-          hue[cell[q]] < C ? slot[cell[q]] : 0,
         );
       }
     }
@@ -459,22 +637,30 @@ const scene: Scene = {
     if (trickle > 0 && t > 0) {
       for (let m = 0; m < TRICKLE; m++) {
         const th = ((m + hash2(m, 3, 61)) / TRICKLE) * Math.PI * 2;
-        const period = 2.8 + 1.8 * hash2(m, 5, 61);
-        const ph = (t / period + hash2(m, 7, 61)) % 1;
+        const per = 2.8 + 1.8 * hash2(m, 5, 61);
+        const ph = (t / per + hash2(m, 7, 61)) % 1;
         const c = Math.cos(th);
         const s = Math.sin(th);
-        const D = toBorder(c, s, B.hw, B.hh, B.lift) * 0.97;
+        const D = toBorder(c, s, B.hw, B.hh, B.ox, B.oy) * 0.97;
         // they fade out at the brain's rim
         const rim = 0.92 / Math.hypot(c / B.a, s / B.b);
         if (D <= rim + 2) continue;
         const d = lerp(D, rim, ph * ph);
         const d0 = lerp(D, rim, Math.max(0, ph - 0.14) ** 2);
         const al = 0.55 * trickle * smoothstep(0, 0.15, ph) * (1 - smoothstep(0.85, 1, ph));
-        const tint = hash2(m, 9, 61) < C ? 1 + (m % SLOTS) : 0;
-        streak(r, cx + c * d, cy + s * d, cx + c * d0, cy + s * d0, al, false, tint);
+        streak(r, cx + c * d, cy + s * d, cx + c * d0, cy + s * d0, al, false);
       }
     }
 
+    // ── never under the mini chart while it shows ────────────────────────
+    // (its rect and opacity for this p, so the hole and the chart move together)
+    const vis = chartVisAt(p, mobile);
+    const { rest, zoom } = chartHole;
+    if (vis > 0 && rest && zoom) {
+      const z = chartZoomAt(p);
+      const v = { x: lerp(rest.x, zoom.x, z), y: lerp(rest.y, zoom.y, z), w: lerp(rest.w, zoom.w, z), h: lerp(rest.h, zoom.h, z) };
+      unpaint(r, v, vis, full);
+    }
   },
 };
 

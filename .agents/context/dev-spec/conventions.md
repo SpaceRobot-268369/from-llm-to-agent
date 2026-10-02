@@ -30,7 +30,7 @@ reference.
 │   ├── engine/
 │   │   ├── ticker.ts         # the one rAF loop: Lenis, section geometry, progress, palette + wipe-split vars
 │   │   ├── phases.ts         # modes (part / read / watch / scaling), placement(); --ph-* vars for CSS
-│   │   ├── layout.ts         # cell sizes, grid, art box (side ↔ focus, hero centre), heroHole + HERO_RINGS
+│   │   ├── layout.ts         # cell sizes, grid, art box (side ↔ focus, hero centre), heroHole + HERO_RINGS, chartHole (scaling mini chart)
 │   │   ├── intro.ts          # loader → hero hand-off: intro.at, sticker BURST timing
 │   │   ├── color.ts          # hex/mix/contrast helpers; VIVID (fixed palette for the col tag)
 │   │   ├── noise.ts          # hash + value noise + fbm + easing

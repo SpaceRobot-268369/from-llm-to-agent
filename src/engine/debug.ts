@@ -7,12 +7,16 @@
  *   window.__sceneBench('rag', { p: 0.5 })   → avg ms per paint
  *
  * ASCII legend: " .:-=+*#%@" = ink intensity (0 → 1); "o" / "O" = accent
- * pixels (mid / strong); "1"–"5" / "a"–"e" = ink cells tagged with a vivid
- * colour (Raster.col → VIVID[0..4] in color.ts: blue, violet, magenta,
- * crimson, orange), strong / mid. Rows are squashed 2:1 so shapes keep their
- * aspect.
+ * pixels (mid / strong); "1"–"3" / "a"–"c" = ink cells tagged with a vivid
+ * colour (Raster.col → VIVID[0..2] in color.ts: blue, violet, magenta),
+ * strong / mid. Rows are squashed 2:1 so shapes keep their aspect.
+ *
+ * The scaling scene reads the live mini-chart rects (layout.chartHole: at
+ * rest and at full zoom, in viewport fractions, measured at the window's
+ * size): pass W / H equal to the window's for a faithful layout.
+ * window.__chartHole shows them.
  */
-import { artRect, BASE_CELL_DESKTOP, BASE_CELL_MOBILE, grid, toGrid, type Side } from './layout';
+import { artRect, BASE_CELL_DESKTOP, BASE_CELL_MOBILE, chartHole, grid, toGrid, type Side } from './layout';
 import { Raster } from './raster';
 import { SCENES } from './scenes';
 import type { SceneId } from './scenes/types';
@@ -34,8 +38,8 @@ type Opts = {
 
 const RAMP = ' .:-=+*#%@';
 /** vivid colour slot k (1-based) → strong / mid glyph */
-const VIVID_STRONG = '12345';
-const VIVID_MID = 'abcde';
+const VIVID_STRONG = '123';
+const VIVID_MID = 'abc';
 
 function paint(id: SceneId, o: Opts) {
   const mobile = !!o.mobile;
@@ -108,12 +112,14 @@ declare global {
     __sceneBench?: typeof bench;
     __goto?: (id: string, progress: number) => void;
     __ticker?: typeof ticker;
+    __chartHole?: typeof chartHole;
   }
 }
 
 export function installDebugHooks() {
   window.__scene = ascii;
   window.__ticker = ticker;
+  window.__chartHole = chartHole;
   window.__sceneBench = bench;
   window.__goto = (id, progress) => {
     const el = document.getElementById(id);
