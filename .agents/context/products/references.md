@@ -3,8 +3,8 @@
 > Every number, date, and attribution on the page must trace to an entry here
 > (content rule in [`content-outline.md`](content-outline.md)). This list is
 > **internal** — for fact-checking only. The page shows no reference list,
-> just two small credit lines in the footer: the source video and the two
-> blog posts.
+> just three small credit lines in the footer: the source video, the two
+> blog posts, and a deeper-dive lecture.
 
 ## Content inspiration
 
@@ -12,6 +12,7 @@
 |--------|----------|
 | Lucas — [*AI Agents: Memory, Harness, Model*](https://lucascanoblog.com/archives/2412) (2026-08-26) | The three-part structure (Model · Memory · Harness). Memory is built into the system prompt; build your own with agent files and/or RAG. The harness as a brain/CPU's peripherals; the harness list; chopsticks vs. spoon; CLI over GUI. Thinking is built in, effort is external. |
 | Lucas — [*Build the Superpower*](https://lucascanoblog.com/archives/2366) (2026-07-16) | 2.4 Agent files (the Memory chapter's knowledge base): AGENTS.md / CLAUDE.md as the project's index, kept concise to avoid context pollution; `.agents/` with context, memory and skills; agents write the updates themselves; "how smart an agent can be depends on the model and its agent files". (The post's worktree half is not used.) |
+| Stanford CS229 — *Building Large Language Models (LLMs)*, guest lecture by Yann Dubois (summer 2024) — [YouTube](https://www.youtube.com/watch?v=9vM4p9NN0Ts) | Footer "deeper dive" link only (added at the author's request); the page takes no facts from it. Speaker and course per the lecture's published notes ([notes repo](https://github.com/Mac-007/Stanford-CS229-I-Machine-Learning-I-Building-Large-Language-Models-LLMs-), [summary](https://saltmarch.com/insight/the-art-and-science-of-building-large-language-models-insights-from-stanford-cs229-lecture)); the channel name was not confirmed, so the credit doesn't name one. |
 | 飞天闪客 — 《名词诈骗！一口气拆穿 Skill/MCP/RAG/Agent/OpenClaw 底层逻辑》 — [YouTube](https://www.youtube.com/watch?v=O9b8tLXCTYU) · [Bilibili](https://www.bilibili.com/video/BV1ojfDBSEPv/) | Overall stance: buzzwords are wrappers around LLM + prompt. Concept lineup (Skill, MCP, RAG, Agent, OpenClaw). The video has no captions; the narrative was cross-checked against written summaries of it ([Tencent Cloud](https://cloud.tencent.com/developer/article/2643926), [Juejin](https://juejin.cn/post/7605494530016821288)). |
 
 ## Facts by section

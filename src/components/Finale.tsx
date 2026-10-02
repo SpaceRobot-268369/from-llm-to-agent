@@ -78,6 +78,13 @@ export function Credits() {
           </span>
         ))}
       </p>
+      <p>
+        {c.deeperLead}{' '}
+        <a href={c.deeper} target="_blank" rel="noreferrer">
+          {c.deeperTitle}
+        </a>{' '}
+        — {c.deeperBy}
+      </p>
     </footer>
   );
 }

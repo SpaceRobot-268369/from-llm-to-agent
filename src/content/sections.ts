@@ -728,5 +728,9 @@ export const FINALE = {
       { title: 'AI Agents: Memory, Harness, Model', href: 'https://lucascanoblog.com/archives/2412' },
       { title: 'Build the Superpower', href: 'https://lucascanoblog.com/archives/2366' },
     ],
+    deeperLead: 'Go deeper with',
+    deeperTitle: 'Stanford CS229 · Building Large Language Models (LLMs)',
+    deeperBy: 'Yann Dubois',
+    deeper: 'https://www.youtube.com/watch?v=9vM4p9NN0Ts',
   },
 };
