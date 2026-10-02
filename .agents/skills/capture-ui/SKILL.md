@@ -45,7 +45,7 @@ show the change best.
    - **read section**, e.g. `next-token` or `agent-files`: headline p≈0.04,
      read p≈0.45 (copy fully revealed, story mid-play), story played p≈0.9.
    - **watch section** `chat` / `rag` / `agent` / `mcp`: headline p≈0.04,
-     read p≈0.42 (copy fully revealed; it leaves at 0.46), watch p≈0.65 and
+     read p≈0.42 (copy fully revealed; it leaves at 0.44), watch p≈0.65 and
      p≈0.88. Chat's read act loops on time (the forgetful new-session
      loop), so that frame depends on the clock.
    - **scaling stage** `scaling-law`: p≈0.35 (growth), 0.75 (the plateau

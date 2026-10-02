@@ -59,12 +59,11 @@ more box around the same model**, in exactly three chapters, each opened by a
 full-screen chapter card:
 
 - **Model:** where the intelligence comes from (next token, scaling law,
-  thinking).
+  chain of thought).
 - **Memory:** AI doesn't have memory, only context (chat, system prompt,
-  context window, memory, RAG).
+  context window, agent files, RAG).
 - **Harness:** how AI touches the world (tool calling, agent loop, MCP,
-  Skill, agent files, multi-agent, agent apps: Claude Code · Codex ·
-  OpenClaw).
+  Skill, multi-agent, agent apps: Claude Code · Codex · OpenClaw).
 
 - **Visual language:** a pixel/halftone canvas (the *Pixel Field*) that
   morphs scene to scene as you scroll. The color journey runs light → dark as

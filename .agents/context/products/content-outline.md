@@ -147,14 +147,15 @@ to each scene's beats.
 - **Layout:** the headline sits **in the centre**, framed by a compact band
   of concentric pixel rectangles (scene `hero`, up to four — as many as fit
   before the HUD) that hug the text; accent corner brackets mark the
-  innermost box — the headline is the model, in its box.
+  innermost box — the headline is the model, in its box. As Chapter 1 wipes
+  in, the whole hero fades out before it reaches the top bar.
 - **Buzzword soup:** terms from the page (LLM, MCP, RAG, Agent, Skill,
   OpenClaw, Token, Memory, Claude Code, Codex, Context window, Thinking,
   AGENTS.md, …) as pixel stickers **scattered all around the headline** (not
   orbiting). Each floats in place, hops now and then, and some have blinking
   pixel eyes. The scatter is seeded best-candidate sampling: evenly spread,
-  the same on every visit, never touching the headline, the HUD, or another
-  sticker. On small screens the lowest-priority terms are left out. Every
+  the same on every visit, never touching the headline's frames, the HUD, or
+  another sticker. On small screens the lowest-priority terms are left out. Every
   sticker is a button that **jumps to the topic that explains it** (e.g.
   MCP → 3.3; Memory and AGENTS.md → 2.4; Thinking → 1.3; Claude Code, Codex,
   OpenClaw → 3.6). Scrolling pulls each sticker back into the headline (the
@@ -177,7 +178,9 @@ to each scene's beats.
   token, widths follow the words) and a framed list of the top three
   candidates with their bars. Scrolling picks the likeliest, lifts it into the
   slot, appends it (the newest generated token in accent) and asks again — the
-  autoregressive loop, in step with the demo beside it.
+  autoregressive loop, in step with the demo beside it. Scene and demo read
+  the same step from the scroll, so they always show the same token, pick
+  and `?`; on phones both play while the demo is fully on screen.
 - **Analogy:** Think of your phone's autocomplete — trained on a library's
   worth of text, and very, very good at guessing.
 - **Title:** An LLM does exactly one thing
@@ -237,7 +240,8 @@ to each scene's beats.
   scaling law plateau?** — *No answer here. Hold the question and keep
   scrolling.* The chart's line forks at the frontier into two dashed branches
   (one keeps falling, one flattens). Then, with more scrolling: the question
-  and the brain fade, and **the chart zooms to the centre** and holds; with
+  and the brain fade, and **the chart zooms to the centre** and holds (drawn
+  at full size there, so its lines and text stay crisp); with
   more scrolling still, the chart leaves and the next topic comes in. Never
   add hints or a verdict.
 
@@ -299,10 +303,13 @@ to each scene's beats.
 
 ### 2.2 · system-prompt (read)
 
-- **Scene `system`:** several file cards — COMPANY, APP, SETTINGS, MEMORY —
-  slide in one by one and stack into the prompt behind a curtain; on the
-  user's side of the curtain the screen shows only their own message, while
-  the model reads the whole stack.
+- **Scene `system`:** one frame is everything the model reads. Four accent
+  file cards — COMPANY, APP, SETTINGS, MEMORY — slide in one by one and
+  settle into their slots above a curtain marked HIDDEN; below it is the only
+  part the user sees: YOU and their own message. Then the model reads it all
+  — a beam sweeps the whole frame, straight through the curtain — and it
+  flows down a dotted arrow into the model (LLM), which lights up. On phones
+  the story loops in time.
 - **Analogy:** Like a waiter's briefing before you sit down: house rules,
   today's specials, a note about your allergy — you never see it.
 - **Title:** The prompt before your prompt
@@ -337,10 +344,14 @@ to each scene's beats.
   (sand palette, dash mark) — agent files are how agents keep memory. It is
   not repeated in Harness.
 - **Scene `agentfiles`:** a pixel file tree beside the agent, drawn as a
-  session window that starts empty. The `AGENTS.MD` index card lights up
-  first and streams into the agent (loaded first); then the agent opens one
-  folder at a time — `CONTEXT`, then `SKILLS` — while the others stay closed
-  (on demand); finally it writes a new note back into `MEMORY`, which glows.
+  session window that starts empty. The tree is the `AGENTS.MD` index card
+  with three folders on branches: `CONTEXT`, `MEMORY`, `SKILLS`. The index
+  card lights up first and streams into the window (loaded first); then the
+  agent opens one folder at a time — `CONTEXT`, then `SKILLS` — which
+  unfolds like a file explorer to show its files; a page slides out to the
+  window, the agent types what it read, and the folder closes again (on
+  demand). Finally it types a new line and writes it back into
+  `MEMORY` → `NOTES`, which glows. On phones the story loops in time.
 - **Analogy:** Like an onboarding binder for a new teammate: read the index
   first, open the rest when needed.
 - **Title:** Memory is just files, read back in
@@ -389,10 +400,14 @@ to each scene's beats.
 
 ### 3.1 · tool-calling (read)
 
-- **Scene `tools`:** a pixel brain (the model) in the middle with tools as
-  its limbs: a hand that does things (edits a file, runs a program) and a
-  foot that goes out and fetches (to a web page and back), joined to the
-  brain by dotted request/result arrows.
+- **Scene `tools`:** a solid pixel brain (the model) on top, with tools as
+  its limbs: its brainstem runs on as a dotted nerve that splits like a body
+  — left to a **hand** (a pointer, DO) beside a page, right to a **foot** (a
+  boot, FETCH) beside a globe; the labels show when there's room. The brain
+  writes a small request note that rides the nerve out to the hand, which
+  clicks the page and adds a line; the result rides back and the brain's
+  folds light up. Then a second note goes to the foot, which hops over to the
+  globe to fetch and back, and the brain lights up again.
 - **Lede:** On its own, a model can only think in text. The harness is
   everything around it — tools, the loop, MCP, skills, sub-agents — each
   coming up next. It turns a chatbot into an agent. *(The blog's
@@ -415,10 +430,14 @@ to each scene's beats.
 
 ### 3.2 · agent ★ (read → **watch**)
 
-- **Scene `agent`:** a thick pixel ring with think · act · observe nodes; a
-  bright runner laps it; the message list inside grows each lap; a small lap
-  counter ticks toward a limit; finally the model answers without a tool
-  call and the runner leaves the ring through an exit with the answer.
+- **Scene `agent`:** a thick pixel ring with think · act · observe nodes (an
+  ellipsis, a gear, an eye); a bright runner laps it, and each lap adds a row
+  to the message list inside (the tool call at act, its result at observe).
+  Above the ring, a STEPS gauge fills one slot per lap toward a solid cap
+  (the step limit), and a closed gate guards a short exit track to an empty
+  answer box. Finally the model answers without a tool call: the gate lifts,
+  the runner leaves along the track, and the box fills with DONE. (In the
+  read act the runner just laps; nothing is counted yet.)
 - **Analogy:** Like fixing something yourself: try, look at what happened,
   try again — until it works.
 - **Title:** An agent is a while-loop
@@ -440,8 +459,8 @@ to each scene's beats.
   - `0.42` — The message list inside the ring keeps growing — the agent's
     record of what it has done. *(list rows stack up)*
   - `0.62` — A counter ticks every lap. Hit the limit — too many steps, or too
-    much spent — and the loop is cut off. *(lap counter / limit bar fills
-    toward a marked cap, but stays under it)*
+    much spent — and the loop is cut off. *(the STEPS gauge fills toward
+    its cap, but stays under it)*
   - `0.82` — This time the model answers without asking for a tool: done. The
     dot leaves the ring with the answer. *(runner exits through a gate into
     an answer box; the loop goes still)*

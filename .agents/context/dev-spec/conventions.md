@@ -28,15 +28,16 @@ reference.
 │   ├── content/
 │   │   └── sections.ts       # ALL page copy, chapters, palettes, scene ids; numbers topics (2.3)
 │   ├── engine/
-│   │   ├── ticker.ts         # the one rAF loop: Lenis, section geometry, progress, palette vars
+│   │   ├── ticker.ts         # the one rAF loop: Lenis, section geometry, progress, palette + wipe-split vars
 │   │   ├── phases.ts         # modes (part / read / watch / scaling), placement(); --ph-* vars for CSS
-│   │   ├── layout.ts         # cell sizes, grid geometry, art box (side ↔ focus, hero centre), heroHole
+│   │   ├── layout.ts         # cell sizes, grid, art box (side ↔ focus, hero centre), heroHole + HERO_RINGS
 │   │   ├── intro.ts          # loader → hero hand-off: intro.at, sticker BURST timing
-│   │   ├── color.ts          # hex/mix/contrast helpers
+│   │   ├── color.ts          # hex/mix/contrast helpers; VIVID (fixed palette for the col tag)
 │   │   ├── noise.ts          # hash + value noise + fbm + easing
-│   │   ├── raster.ts         # grid-resolution buffer (ink + accent channels)
-│   │   ├── halftone.ts       # buffer → quantized halftone marks (square / dash / cross per chapter)
+│   │   ├── raster.ts         # grid-resolution buffer (ink + accent channels, vivid colour tag col)
+│   │   ├── halftone.ts       # buffer → halftone marks (square / dash / cross per chapter) in ink / accent / vivid
 │   │   ├── PixelField.tsx    # fixed full-screen canvas; topic dissolve, chapter wipe
+│   │   ├── wipe.ts           # EDGE, wipeFront(): the wipe front, shared by the canvas and the split chrome
 │   │   ├── debug.ts          # DEV ONLY: window.__scene / __sceneBench / __goto / __ticker
 │   │   └── scenes/
 │   │       ├── types.ts      # Scene contract, SceneId
@@ -44,9 +45,9 @@ reference.
 │   │       ├── index.ts      # SCENES registry
 │   │       ├── part.ts       # intentionally empty: chapter cards show no diagram
 │   │       └── one file per scene: hero, tokens, scaling, thinking, chat, system, window,
-│   │           memory, rag, tools, agent, mcp, skill, agentfiles, subagents, agents, unwrap
+│   │           agentfiles, rag, tools, agent, mcp, skill, subagents, agents, unwrap
 │   ├── components/
-│   │   ├── Hero.tsx          # centred headline + scattered buzzword stickers (burst, pull-in, jump)
+│   │   ├── Hero.tsx          # centred headline + chapter chips, ring fit, stickers (burst, pull-in, jump)
 │   │   ├── ChapterCard.tsx   # full-screen chapter opener: numeral, name, thesis, contents list
 │   │   ├── Section.tsx       # topic section; HeadlineCard, Watch, product switcher
 │   │   ├── ScalingSection.tsx# sticky stage: milestones, counters, chart, plateau question
@@ -64,14 +65,19 @@ reference.
 1. `ticker.ts` advances Lenis, reads the scroll position, and computes:
    - the current section `cur`, its local progress `p` (0→1 across its
      sticky phase), and `blend` (0→1 as the next section slides in);
-   - the global progress.
+   - the global progress;
+   - on mobile, `mobileScene`: scene progress from where a watch steps list
+     (or 1.1's token demo) sits on screen.
 2. It writes `--p` on each section element whose progress changed (CSS
-   reveals read it), and the blended palette (`--bg`, `--ink`, `--px`,
-   `--accent`) on `:root`.
+   reveals read it), `--leave` (the blend) on the current section, and on
+   `:root` the blended palette (`--bg`, `--ink`, `--px`, `--accent`) plus the
+   wipe split for fixed chrome (`--bg-l`, `--bg-r`, `--split`, `--split-x`,
+   `--split-r`, from `wipeFront()` in `wipe.ts`).
 3. `PixelField` paints scene `cur` (and scene `next` while blending) into
    grid-resolution rasters, clips each to its art box, blends them (a blocky
    dissolve between topics, a left → right wipe between chapters), and draws
-   halftone marks in the chapter's shape (squares / dashes / crosses).
+   halftone marks in the chapter's shape (squares / dashes / crosses), in
+   the ink, accent or tagged vivid colour.
 4. HUD components update text through refs. **No React state changes per
    frame.**
 
@@ -89,7 +95,10 @@ reference.
   [`design-language.md`](../products/design-language.md#scene).
 - **Ink vs. accent channels.** Paint ordinary pixels with `INK(a)` and
   highlighted pixels with `ACC(a)`. Never hardcode a color in a scene; colors
-  come from the section palette.
+  come from the section palette. The one exception is a slot of the fixed
+  `VIVID` palette, tagged through `Raster.col`, where colour itself is the
+  meaning (the scaling brain; see
+  [`design-language.md`](../products/design-language.md#ink--accent-channels)).
 - **One ticker.** Never add another `requestAnimationFrame` loop or scroll
   listener. Subscribe to `ticker.onFrame` instead.
 - **Palettes follow the color journey.** Backgrounds darken monotonically,
@@ -120,11 +129,12 @@ reference.
   Bake expensive noise into lookup textures, as `scenes/scaling.ts` does.
 - **Debug hooks are dev-only.** `src/engine/debug.ts` is loaded through a
   dynamic import behind `import.meta.env.DEV`, so it never ships. It installs
-  `window.__scene` (ASCII render), `__sceneBench`, `__goto(id, progress)` and
-  `__ticker` (the ticker itself). A hidden preview pane pauses rAF and
-  `ResizeObserver`, so drive frames by hand with
-  `__ticker.tick(performance.now())`, and move the scroll with
-  `__ticker.lenis.scrollTo(y, { immediate: true, force: true })`: the ticker
+  `window.__scene(id, { p, t, mobile, W, H, focus, side })` (ASCII render;
+  vivid-tagged cells show as `1`–`5` / `a`–`e`), `__sceneBench`,
+  `__goto(id, progress)` and `__ticker` (the ticker itself). A hidden preview
+  pane pauses rAF and `ResizeObserver`, so drive frames by hand with
+  `__ticker.tick(now)`, `now` growing ~16 ms per call, and move the scroll
+  with `__ticker.lenis.scrollTo(y, { immediate: true, force: true })`: the ticker
   reads Lenis's position, and `window.scrollTo` (which `__goto` uses) is not
   seen while the pane is hidden. Under reduced motion there is no Lenis
   (`lenis` is `null`), so plain `window.scrollTo` works. Full recipe:

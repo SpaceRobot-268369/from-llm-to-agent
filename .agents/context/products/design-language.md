@@ -28,15 +28,17 @@ Each frame:
 
 1. Pick the current section's scene, and the next one while it slides in.
 2. Paint each into a grid-resolution [`Raster`](../../../src/engine/raster.ts)
-   (two channels: `ink` and `acc`).
+   (two channels, `ink` and `acc`, plus an optional colour tag, `col`; see
+   **Ink & accent channels**).
 3. Clip each to its art box, combine with the **dissolve** (topics) or
    **wipe** (chapters), apply the act's visibility, and add **dust** and the
    **pointer halo**.
 4. Draw with the **halftone** renderer.
 
 **Key knobs.** `BASE_CELL_DESKTOP` = 9px and `BASE_CELL_MOBILE` = 7px in
-[`layout.ts`](../../../src/engine/layout.ts). `EDGE` (dissolve front width)
-and `POINTER_RADIUS` are in `PixelField.tsx`.
+[`layout.ts`](../../../src/engine/layout.ts). `EDGE` (dissolve and wipe
+front width) is in [`wipe.ts`](../../../src/engine/wipe.ts);
+`POINTER_RADIUS` is in `PixelField.tsx`.
 
 ## Cell & grid
 
@@ -70,29 +72,41 @@ compose relative to `box`, never to fixed cells.
 
 ## Hero
 
-**What it means.** The opener: a centred headline framed by seven concentric
-pixel rectangles that step out from just around the text to the screen
-edges. The innermost frame carries accent corner brackets; the core stays
-empty, because the headline is the model. The frames hug `heroHole`, the
-headline's real extent, which `Hero.tsx` re-measures on resize and font
-load. Scrolling peels them off outward.
+**What it means.** The opener: a centred headline framed by a **compact
+ring band**: up to four concentric pixel rectangles (`HERO_RINGS`, 0 / 2 /
+4 / 7 cells out from the text, solid → fine dots). The band hugs `heroHole`,
+the headline's real extent, which `Hero.tsx` re-measures on resize and font
+load; it keeps only the rings that fit inside the art box and clear of the
+HUD (`heroHole.rings`). The innermost frame carries accent corner brackets;
+the core stays empty, because the headline is the model. Scrolling peels the
+rings off outward, outermost first, each drifting out a few cells as it
+fades.
 
+- **Chapter chips.** Under the lede, *Model · Memory · Harness* are three
+  solid ink chips (Silkscreen, background-coloured text, a hard accent
+  shadow), built from `CHAPTERS`. Each jumps to its chapter card. They come
+  before the stickers in the DOM, so Tab reaches them first.
 - **Buzzword stickers.** `HERO_WORDS` are pixel stickers *scattered* around
-  the headline (seeded best-candidate sampling, so the same scatter on every
-  visit, never touching the headline, the HUD or each other; on small
-  screens the lowest-priority ones are left out). Each floats in place and
-  is a button that jumps to the section that explains it (`to`).
+  the band (seeded best-candidate sampling, so the same scatter on every
+  visit, never touching the band, the HUD, the scroll cue or each other; on
+  small screens the lowest-priority ones are left out). Each floats in place
+  and is a button that jumps to the section that explains it (`to`).
 - **Intro.** The loader fills 16 pixel cells (fonts ready, ~1.1s minimum),
   then collapses into one square and fades. As the fade starts (`intro.at`),
-  the stickers **burst** out of the headline's centre (staggered, overshooting).
-  Scrolling pulls them back in, one after another. Reduced motion: no burst,
-  no float.
+  the stickers **burst** out of the headline's centre (staggered, overshooting,
+  but never past the free area). Scrolling pulls them back in, one after
+  another. Reduced motion: no burst, no float.
+- **Leaving.** As Chapter 1 wipes in, the whole hero fades out, gone by
+  blend 0.2, before its text can slide under the top bar. The ticker writes
+  `--leave` (the blend, 0 → 1) on the current section; the hero's sticky
+  stage reads it.
 
 **Reference:** [`Hero.tsx`](../../../src/components/Hero.tsx),
 [`Loader.tsx`](../../../src/components/Loader.tsx),
-[`scenes/hero.ts`](../../../src/engine/scenes/hero.ts), `heroHole` in
-`layout.ts`, `intro` / `BURST` in
-[`intro.ts`](../../../src/engine/intro.ts).
+[`scenes/hero.ts`](../../../src/engine/scenes/hero.ts), `heroHole` /
+`HERO_RINGS` / `heroRing()` in `layout.ts`, `intro` / `BURST` in
+[`intro.ts`](../../../src/engine/intro.ts), `.hero__chapter` and
+`.sec--hero .sec__sticky` in `global.css`.
 
 ## Chapters
 
@@ -201,7 +215,7 @@ colour and accent cells in its `accent` colour. Scenes never name a colour.
 
 **Rule.** Accent is for the **one new idea** of the section: the newest
 token, the retrieved pages, the agent's runner, the matched skill, the hidden
-system band.
+system-prompt cards.
 
 **The one exception: vivid colour.** Where colour itself is the meaning —
 the scaling brain lighting up fold by fold as the model grows (more colour =
@@ -210,8 +224,9 @@ palette ([`color.ts`](../../../src/engine/color.ts)) through `Raster.col`.
 The hues are saturated mid-darks that stay legible on the scaling green and
 never read as ink; the brain's rim stays ink. The tag is cleared every frame
 and travels through the dissolve like the accent does, so scenes that never
-write it are unaffected. `__scene` shows tagged cells as `1`–`5` (strong) /
-`a`–`e` (mid).
+write it are unaffected. The halftone renderer draws one path per tone
+(`TONE_INK`, `TONE_ACC`, then `TONE_VIVID + k` in `halftone.ts`). `__scene`
+shows tagged cells as `1`–`5` (strong) / `a`–`e` (mid).
 
 ## Scene
 
@@ -240,7 +255,9 @@ type Scene = {
 - `t` is time in seconds, frozen at 0 under reduced motion. Motion is
   ambient; the meaning must survive `t = 0`. The exception is **chat**: at
   p = 0 (its read act) it loops the forgetful new-session story on `t`
-  every 9s, and at `t = 0` it holds the "?" frame.
+  every 9s, and at `t = 0` it holds the "?" frame. On phones, `system` and
+  `agentfiles` also play on `t` (`loopP`), because the copy covers their art
+  band early; at `t = 0` they hold the finished picture.
 - Budget: **≤ 1.5 ms per paint** on the desktop grid.
 
 **Tools.** Helpers in
@@ -260,7 +277,8 @@ image breaks apart in pixel chunks rather than cross-fading. On desktop the
 incoming topic opens on its headline card (no diagram), so the old diagram
 breaks apart into a clean background.
 
-**Key knob.** `EDGE` (0.28) sets the width of the soft front.
+**Key knob.** `EDGE` (0.28, in `wipe.ts`, shared with the wipe) sets the
+width of the soft front.
 
 ## Chapter wipe
 
@@ -272,8 +290,22 @@ background splits at the front: the new chapter's colour fills in behind it
 (left), the old one stays ahead of it (right), instead of the usual colour
 blend. Each cell takes the new chapter's halftone mark as it flips.
 
+**Split chrome.** The fixed chrome splits at the same front, so no old-colour
+box sits on the new canvas: the top bar's backdrop, the Top button and the
+stack trail. `wipeFront(blend)` gives the front's position for both the
+canvas and the ticker. The ticker writes `--bg-l` (new chapter, left),
+`--bg-r` (old chapter, right) and the front: `--split` (% of the width, for
+full-width chrome via `--bg-split`) and `--split-x` / `--split-r` (px from
+the left / right edge, so small chrome places it inside its own box;
+`background-attachment: fixed` is ignored on iOS and on transformed boxes).
+Outside a wipe both colours are the blended `--bg` and the front sits at the
+right edge.
+
 **Reference:** the `wipe` branch in
-[`PixelField.tsx`](../../../src/engine/PixelField.tsx).
+[`PixelField.tsx`](../../../src/engine/PixelField.tsx);
+[`wipe.ts`](../../../src/engine/wipe.ts) (`EDGE`, `wipeFront()`); the split
+vars in `ticker.ts`; `.topbar::before`, `.totop` and `.trail` in
+`global.css`.
 
 ## Dust
 
@@ -322,12 +354,14 @@ model:
 Hero:      paper #F2EFE7
 Chapter 1: [GREEN card] → #EEEAE0 → [GREEN scaling] → #E9E5DA        accent green
 Chapter 2: [BLUE card]  → #E8E1D1 → #E0D7C3 → #D7CDB7 → #CDC2A8 → [BLUE RAG]   accent blue
-Chapter 3: [ORANGE card] → #5A564E → [ORANGE agent] → #4A4740 → #3D3B36 → #36342F → #302E2A → #1C1A17   accent orange
+Chapter 3: [ORANGE card] → #5A564E → [ORANGE agent] → #4A4740 → #3D3B36 → #302E2A → #1C1A17   accent orange
 Finale:    night #0A0A09
 ```
 
 - **Signature colours** (brackets): each chapter card, plus the chapter's key
   topic (Scaling law, RAG, Agent loop), uses the chapter colour full-bleed.
+- **Agent files** (2.4) is Memory's darkest sand, `#CDC2A8`, just before
+  RAG; Harness steps straight from Skill to Multi-agent.
 - **Ink flips** from dark to light at the Harness chapter. During a blend, the ticker
   shows whichever section's ink contrasts more with the current background,
   so text is never mid-grey on mid-grey.
@@ -369,6 +403,8 @@ model.
 
 **What it means.** A small pixel-font "Top" button, bottom-right, that
 appears once you have scrolled ~80% of a viewport and jumps back to the hero.
+Its background splits with a chapter wipe (see **Chapter wipe**), as does
+the stack trail's.
 
 **Reference:** `BackToTop` in
 [`src/components/Hud.tsx`](../../../src/components/Hud.tsx); `.totop` in
@@ -381,7 +417,7 @@ appears once you have scrolled ~80% of a viewport and jumps back to the hero.
 | Display & titles | Archivo (variable width) | titles `font-stretch: 84%`, weight ~680; hero 70% / 800, uppercase |
 | Body | Archivo | 15.5–17.5px, `text-wrap: pretty` |
 | Labels, code, HUD | JetBrains Mono | uppercase labels with 0.1–0.14em tracking |
-| Numerals & pixel labels | Silkscreen | the pixel font — numbers (parameter counter, step and watch numbers, chapter numerals, contents, rail and product numbers), hero stickers, chart fork labels, loader readout, Top button, wordmark |
+| Numerals & pixel labels | Silkscreen | the pixel font — numbers (parameter counter, step and watch numbers, chapter numerals, contents, rail and product numbers), hero stickers, hero chapter chips, chart fork labels, loader readout, Top button, wordmark |
 
 ## Pixel font
 
