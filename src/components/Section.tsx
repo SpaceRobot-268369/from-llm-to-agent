@@ -13,13 +13,10 @@ const STAGGER = 0.035;
 export function HeadlineCard({ s }: { s: SectionData }) {
   return (
     <header className="card">
-      {s.part && (
-        <>
-          <p className="part">{s.part.label}</p>
-          <p className="card__partline">{s.part.line}</p>
-        </>
-      )}
-      <p className="kicker kicker--center">{s.kicker}</p>
+      <p className="kicker kicker--center">
+        {s.num ? `${s.num} · ` : ''}
+        {s.kicker}
+      </p>
       <h2 className="card__title" id={`${s.id}-title`}>
         {s.title}
       </h2>
@@ -50,38 +47,13 @@ export function Watch({ steps, formula, label }: { steps: Caption[]; formula?: s
           </li>
         ))}
       </ol>
-      {formula && <Formula text={formula} className="watch__formula" />}
+      {formula && <Formula text={formula} className="watch__formula" ariaHidden />}
     </div>
   );
 }
 
 export function Section({ s, index }: { s: SectionData; index: number }) {
   const style = { '--len': s.length } as CSSProperties;
-
-  if (s.kind === 'hero') {
-    const [first, second] = s.title.split(/ (?=to )/);
-    return (
-      <section id={s.id} className="sec sec--hero" style={style} ref={(el) => ticker.register(index, el)}>
-        <div className="sec__sticky">
-          <div className="sec__copy hero">
-            <p className="kicker">{s.kicker}</p>
-            <h1 className="hero__title">
-              <span>{first}</span> <span>{second}</span>
-            </h1>
-            <p className="hero__lede">{s.lede}</p>
-            {s.body?.map((b) => (
-              <p key={b} className="hero__body">
-                {b}
-              </p>
-            ))}
-          </div>
-          <p className="hero__cue" aria-hidden="true">
-            {UI.scroll} <span>↓</span>
-          </p>
-        </div>
-      </section>
-    );
-  }
 
   const mode = modeOf(s) ?? 'read';
   let at = PHASES[mode].readIn[1] - 0.02;
@@ -106,6 +78,7 @@ export function Section({ s, index }: { s: SectionData; index: number }) {
           <div className="sec__copy">
             {s.lede && <p className="lede">{s.lede}</p>}
             <p className="kicker" aria-hidden="true">
+              {s.num ? `${s.num} · ` : ''}
               {s.kicker}
             </p>
             <p className="title" aria-hidden="true">
@@ -125,18 +98,25 @@ export function Section({ s, index }: { s: SectionData; index: number }) {
               </ol>
             )}
             {s.code && <CodeBlock code={s.code} at={next()} />}
-            {s.unwrap && (
-              <ul className="unwrap-list rv" style={{ '--at': next() } as CSSProperties}>
-                {s.unwrap.map((u) => (
-                  <li key={u.label} className={u.ref === 'new' ? 'is-new' : undefined}>
-                    <span>{u.label}</span>
-                    <i aria-hidden="true" />
-                    <b>{u.ref === 'new' ? 'new' : `§ ${u.ref}`}</b>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {s.note && (
+            {s.products && (
+            <div className="products rv" style={{ '--at': next() } as CSSProperties} role="group" aria-label={UI.productsLabel}>
+              {s.products.map((pr, i) => (
+                <div
+                  key={pr.name}
+                  className="products__item"
+                  style={{ '--a': i === 0 ? -1 : pr.at, '--b': s.products![i + 1]?.at ?? 2 } as CSSProperties}
+                >
+                  <span className="products__n" aria-hidden="true">
+                    {i + 1}/{s.products!.length}
+                  </span>
+                  <b className="products__name">{pr.name}</b>
+                  <span className="products__by">{pr.by}</span>
+                  <span className="products__where">{pr.where}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {s.note && (
               <p className="note rv" style={{ '--at': next() } as CSSProperties}>
                 {s.note}
               </p>

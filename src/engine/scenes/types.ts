@@ -22,9 +22,9 @@ export type SceneState = {
   /**
    * Scene progress 0 → 1: the section's sticky progress remapped by
    * sceneProgress() to the act where the story plays (raw section progress on
-   * mobile, or the steps-list position for mobile WATCH sections). p = 0 is
-   * shown through the headline and — for watch sections — the read act, so it
-   * must be a complete composition.
+   * mobile, or the steps-list position for mobile WATCH sections). Nothing is drawn while the headline card is up;
+   * p = 0 is the frame the diagram fades in on (and, for watch sections, the
+   * frame held through the read act), so it must be a complete composition.
    */
   p: number;
   /** Seconds since start. Frozen at 0 with prefers-reduced-motion. */
@@ -38,6 +38,12 @@ export type Scene = {
   paint(s: SceneState): void;
   /** Optional desired cell size (CSS px) at progress p. Defaults to `base`. */
   cell?: (p: number, base: number) => number;
+  /**
+   * Every scene is clipped to its art box (+1 cell) so it can never overlap
+   * the text column. Return true to paint the whole screen at progress p —
+   * only for moments when no text sits beside the art (e.g. a centred finale).
+   */
+  unclipped?: (p: number) => boolean;
 };
 
 export type SceneId =
@@ -54,6 +60,8 @@ export type SceneId =
   | 'agent'
   | 'mcp'
   | 'skill'
+  | 'agentfiles'
   | 'subagents'
-  | 'openclaw'
+  | 'agents'
+  | 'part'
   | 'unwrap';

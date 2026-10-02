@@ -8,7 +8,7 @@
 
 | Doc | What it covers |
 |-----|----------------|
-| [`content-outline.md`](content-outline.md) | **The content design.** Thesis, audience, parts, and every section's copy, scene, palette, and formula. Source of truth for `src/content/sections.ts`. |
+| [`content-outline.md`](content-outline.md) | **The content design.** Thesis, audience, chapters, and every section's copy, scene, palette, and formula. Source of truth for `src/content/sections.ts`. |
 | [`design-language.md`](design-language.md) | Named visual terms (*Pixel Field*, *halftone levels*, *dissolve*, *color journey*, …) with canonical code references and key knobs. |
 | [`references.md`](references.md) | Sources for every fact on the page, plus what is explicitly illustrative. |
 

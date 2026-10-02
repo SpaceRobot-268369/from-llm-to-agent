@@ -1,13 +1,15 @@
 /**
- * unwrap — the finale. The hero's nested boxes return and collapse inward as
- * you scroll, outermost first, until only the blinking core is left: the next
- * token.
+ * unwrap — the finale. Nested boxes, one per wrapper the page added around
+ * the model, collapse inward as you scroll, outermost first, until only the
+ * blinking core is left: the next token.
  */
+import { SECTIONS } from '../../content/sections';
 import { easeInOut, range } from '../noise';
 import type { Scene } from './types';
 import { blink, nestedBoxes } from './helpers';
 
-const COUNT = 11;
+/** one box per distinct stack-trail wrap outside the core (the LLM), so the boxes and the trail unwind together */
+const COUNT = new Set(SECTIONS.map((s) => s.wrap).filter(Boolean)).size - 1;
 
 const scene: Scene = {
   paint({ r, box, p, t }) {

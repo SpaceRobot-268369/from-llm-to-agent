@@ -14,13 +14,13 @@
 > **Every AI product = Model + Memory + Harness.**
 
 An LLM does exactly one thing: predict the next token. Everything else is a
-box built around it, and the boxes fall into three parts:
+box built around it, and the boxes fall into three chapters:
 
-| Part | Name | One-line thesis |
-|------|------|-----------------|
-| I | **Model** | Where the intelligence comes from. |
-| II | **Memory** | AI doesn't have memory. It only has context. |
-| III | **Harness** | A model is a brain with no hands; the harness is how it touches the world. |
+| Chapter | Name | One-line thesis |
+|---------|------|-----------------|
+| 1 | **Model** | Where the intelligence comes from. |
+| 2 | **Memory** | AI doesn't have memory. It only has context. |
+| 3 | **Harness** | A model is a brain with no hands. The harness is how it touches the world. |
 
 The three-part frame comes from the author's own post,
 [*AI Agents: Memory, Harness, Model*](https://lucascanoblog.com/archives/2412).
@@ -56,49 +56,79 @@ diagram.
 - **One page**, scroll-linked. A global pixel/halftone canvas (the *Pixel
   Field*) morphs from one scene to the next as you scroll. See
   [`design-language.md`](design-language.md).
-- **Every section opens with a centred headline card**: part label + part
-  thesis (first section of a part only), kicker, big title, and the "In plain
-  words" analogy. The diagram is a dim ghost behind it.
-- **Read act:** the text column sits beside the diagram, and the diagram's
-  story plays as you read. **Sides alternate** section by section (diagram
-  right, then left, …), so the eye keeps moving.
-- **Watch act — only for the key animations.** Chat, RAG, Agent, MCP, and the
-  finale add a third act: the text leaves, the diagram glides to the centre,
-  grows, and plays its story with numbered captions, ending on the formula.
-  Every other section is headline → read only. Not every animation needs its
-  own stage.
-- **Color journey: light → dark.** The background darkens as boxes stack up.
-  Signature sections break the gradient: Scaling Law (green), RAG (blue),
-  Agent (orange), and OpenClaw (lobster red on near-black).
-- **Formula chip** at the end of every concept: one line that shows the new
+- **Three chapters, nothing else at the top level.** The page is Hero →
+  Chapter 1 *Model* → Chapter 2 *Memory* → Chapter 3 *Harness* → Finale.
+  Every topic is nested inside a chapter and numbered `chapter.topic`
+  (1.1, 2.3, 3.6). Numbers are assigned automatically from the order in
+  `sections.ts`; kickers never carry a number of their own.
+- **Chapter openers.** Each chapter starts with a full-screen *chapter card*
+  in the chapter's signature colour: a giant pixel numeral, the chapter name,
+  its one-line thesis, and a mini table of contents of its topics — each
+  entry jumps to its topic (inert once the card has lifted away). No
+  diagram — the card is the only thing on screen. It **holds** for most of a
+  screen of scrolling before it leaves (the *buffer*).
+- **Chapters look different.** Each chapter has its own colour family and
+  its own **pixel mark** in the halftone: Model = squares, Memory = dashes
+  (like lines of text), Harness = crosses. Chapter changes use a directional
+  pixel *wipe*; topic changes inside a chapter use the blocky *dissolve*.
+- **Every topic opens with a centred headline card** (number, title, "In
+  plain words" analogy) on a clean background — **no diagram at all** until
+  the headline leaves.
+- **Read act:** the text column sits beside the diagram; in read-only topics
+  the diagram's story plays as you read (watch topics save it for the watch
+  act). **Sides alternate** topic by topic, restarting on the right in each
+  chapter. Diagrams are clipped to their own region and never overlap the
+  text.
+- **Watch act — only for the key animations.** Chat, RAG, Agent loop, MCP,
+  and the finale add a third act: the text leaves, the diagram glides to the
+  centre, grows, and plays its story with numbered captions, ending on the
+  formula.
+- **Buffers.** Headlines hold before they leave, and every section ends on a
+  still frame before the next one slides in.
+- **Formula chip** at the end of every topic: one line that shows the new
   box wrapped around the old one.
-- **Stack trail** (HUD, bottom-left): how many boxes now surround the model.
+- **HUD:** top-right shows `Chapter · topic`; the right-edge progress rail is
+  grouped into the three chapters; the bottom-left stack trail counts the
+  boxes around the model; once you've scrolled most of a screen (0.8 of the
+  viewport height), an **↑ Top** button bottom-right scrolls back to the hero.
 - **Calm motion.** Cursors pulse slowly and never hard-blink. The mouse halo
   is faint.
 - **No reference list on the page.** Sources live in
   [`references.md`](references.md) for fact-checking only. The footer carries
   two small credit lines (the video and the blog post).
 
+## Chapters
+
+| # | Chapter | Thesis | Colour family | Pixel mark |
+|---|---------|--------|---------------|-----------|
+| 1 | **Model** | Where the intelligence comes from. | paper & cream, signature **green** | squares |
+| 2 | **Memory** | AI doesn't have memory. It only has context. | sand, signature **blue** | dashes |
+| 3 | **Harness** | A model is a brain with no hands. The harness is how it touches the world. | graphite, signature **orange** | crosses |
+
 ## Structure at a glance
 
-| § | id | Part | Acts | Palette (bg) | Scene |
-|---|----|------|------|--------------|-------|
-| 00 | hero | — | (its own) | paper `#F2EFE7` | `hero` |
-| 01 | next-token | I Model | read | `#ECE8DD` | `tokens` |
-| 02 | scaling-law ★ | I Model | (own stage) | green `#5DCB8A` | `scaling` |
-| 03 | thinking | I Model | read | `#E9E3D5` | `thinking` |
-| 04 | chat | II Memory | **watch** | `#E6DFCF` | `chat` |
-| 05 | system-prompt | II Memory | read | `#DED5C1` | `system` |
-| 06 | context-window | II Memory | read | `#D4CAB4` | `window` |
-| 07 | memory | II Memory | read | `#C9BEA4` | `memory` |
-| 08 | rag ★ | II Memory | **watch** | blue `#8FB4E3` | `rag` |
-| 09 | tool-calling | III Harness | read | stone `#9C9585` | `tools` |
-| 10 | agent ★ | III Harness | **watch** | orange `#E8582A` | `agent` |
-| 11 | mcp | III Harness | **watch** | graphite `#55524C` | `mcp` |
-| 12 | skill | III Harness | read | `#3B3934` | `skill` |
-| 13 | multi-agent | III Harness | read | `#2A2825` | `subagents` |
-| 14 | openclaw ★ | III Harness | read | `#181614` + red pixels | `openclaw` |
-| 15 | unwrap | finale | **watch** | night `#0A0A09` | `unwrap` |
+| # | id | Chapter | Acts | Background | Scene |
+|---|----|---------|------|------------|-------|
+| — | hero | — | (own) | paper `#F2EFE7` | `hero` |
+| 1 | part-model | Model | chapter card | green `#5DCB8A` | `part` (empty) |
+| 1.1 | next-token | Model | read | `#EEEAE0` | `tokens` |
+| 1.2 | scaling-law ★ | Model | (own stage) | green `#5DCB8A` | `scaling` |
+| 1.3 | thinking | Model | read | `#E9E5DA` | `thinking` |
+| 2 | part-memory | Memory | chapter card | blue `#8FB4E3` | `part` (empty) |
+| 2.1 | chat | Memory | **watch** | `#E8E1D1` | `chat` |
+| 2.2 | system-prompt | Memory | read | `#E0D7C3` | `system` |
+| 2.3 | context-window | Memory | read | `#D7CDB7` | `window` |
+| 2.4 | memory | Memory | read | `#CDC2A8` | `memory` |
+| 2.5 | rag ★ | Memory | **watch** | blue `#8FB4E3` | `rag` |
+| 3 | part-harness | Harness | chapter card | orange `#E8582A` | `part` (empty) |
+| 3.1 | tool-calling | Harness | read | `#5A564E` | `tools` |
+| 3.2 | agent ★ | Harness | **watch** | orange `#E8582A` | `agent` |
+| 3.3 | mcp | Harness | **watch** | `#4A4740` | `mcp` |
+| 3.4 | skill | Harness | read | `#3D3B36` | `skill` |
+| 3.5 | agent-files | Harness | read | `#36342F` | `agentfiles` |
+| 3.6 | multi-agent | Harness | read | `#302E2A` | `subagents` |
+| 3.7 | agent-apps ★ | Harness | read | `#1C1A17` | `agents` |
+| — | unwrap | finale | **watch** | night `#0A0A09` | `unwrap` |
 
 ---
 
@@ -108,19 +138,39 @@ Canonical English copy. Watch captions are listed in order; their `at`
 timings (scene progress) live in `sections.ts` beside the text and are tuned
 to each scene's beats.
 
-### 00 · hero
+### hero
 
-- **Scene `hero`:** concentric pixel boxes around one solid core square; the
-  core pulses softly. Scrolling peels the boxes off outward.
+- **Loader (before the hero):** a bar of 16 pixel cells fills as the page
+  gets ready (fonts loaded, never under ~1.1 s so it doesn't flicker), with a
+  *Loading tokens 000%* readout. When it completes, the bar collapses into
+  one accent square, the overlay fades, the headline fades up — and the
+  stickers **burst out of the centre** to their spots.
+- **Layout:** the headline sits **in the centre**, framed by concentric pixel
+  rectangles (scene `hero`) that step out from just around the text to the
+  screen edges; accent corner brackets mark the innermost box — the headline
+  is the model, in its box.
+- **Buzzword soup:** terms from the page (LLM, MCP, RAG, Agent, Skill,
+  OpenClaw, Token, Memory, Claude Code, Codex, Context window, Thinking, …) as
+  pixel stickers **scattered all around the headline** (not orbiting). Each
+  floats in place, hops now and then, and some have blinking pixel eyes. The
+  scatter is seeded best-candidate sampling: evenly spread, the same on every
+  visit, never touching the headline, the HUD, or another sticker. On small
+  screens the lowest-priority terms are left out. Every sticker is a button
+  that **jumps to the topic that explains it** (e.g. MCP → 3.3; Claude Code,
+  Codex, OpenClaw → 3.7). Scrolling pulls each sticker back into the
+  headline (the burst, reversed); then the boxes peel away outward.
 - **Kicker:** A SCROLLING FIELD GUIDE · **Title:** From LLM to Agent
-- **Lede:** Skill. MCP. RAG. Agent. OpenClaw. A new word every month — and
-  most of them are the same model in a new box.
-- **Body:** Three parts: the Model, its Memory, and its Harness. Scroll to
-  stack the boxes — the page gets darker as they pile up.
+- **Lede (short — the details come later):** A new AI word every month. Most
+  are the same model in a new box.
+- **Line:** Model · Memory · Harness
 
-### Part I — Model · *Where the intelligence comes from.*
+### Chapter 1 — Model · *Where the intelligence comes from.*
 
-### 01 · next-token (read)
+- **Chapter card (`part-model`):** giant pixel numeral `01`, kicker
+  *Chapter 1 of 3*, title **Model**, thesis, and contents: 1.1 Next token ·
+  1.2 Scaling law · 1.3 Thinking.
+
+### 1.1 · next-token (read)
 
 - **Scene `tokens`:** a row of token blocks; new tokens append one at a time,
   the newest in accent (the autoregressive loop).
@@ -136,11 +186,13 @@ to each scene's beats.
   ` windowsill` 6%, ` keyboard` 4% — labeled *illustrative*.
 - **Formula:** `LLM(tokens) → next token`
 
-### 02 · scaling-law ★ (headline card, then its own stage)
+### 1.2 · scaling-law ★ (headline card, then its own stage)
 
-- **Scene `scaling`:** an organic halftone brain that **grows in size and
-  detail**, while the **grid itself gets finer** (cell ~30px → ~6px). More
-  cells means more parameters, which means a sharper picture.
+- **Scene `scaling`:** pixels **fly in from every direction and converge
+  on the centre**, settling into the shape of a brain. The more pixels have
+  arrived (the bigger the model), the clearer the brain gets. A small, cute
+  face (two eyes, a smile) appears at the brain's lower left once it is
+  clear — the intelligence showing up.
 - **Analogy:** Like a photo gaining pixels: the same picture, sharper at
   every step.
 - **Title:** Make it bigger. It gets better — predictably.
@@ -149,9 +201,9 @@ to each scene's beats.
   parameters (the model's adjustable numbers — its "size"), training data, and
   compute (the computing power spent on training). You could draw the curve
   before training the model.
-- **Formula:** `L(N) ≈ (Nc / N)^0.076`, glossed underneath as "L = error, N =
-  parameters · Kaplan et al., 2020". The chart's axes read *scale (log)* and
-  *error (log)*.
+- **Formula:** `L(N) ≈ (N_c / N)^0.076` (`_c` renders as a subscript),
+  glossed underneath as "L = error, N = parameters · Kaplan et al., 2020".
+  The chart's axes read *scale (log)* and *error (log)*.
 - **Milestones** (counters interpolate log-linearly, resting on exact values):
 
   | Model | Year | Parameters | Training tokens | Caption |
@@ -160,15 +212,19 @@ to each scene's beats.
   | GPT-2 | 2019 | 1.5B | — | Coherent paragraphs. Released in stages over misuse concerns. |
   | GPT-3 | 2020 | 175B | 300B | Learns a new task from a few examples in the prompt. |
   | Chinchilla | 2022 | 70B | 1.4T | Smaller, fed far more data — and beat the 280B Gopher. Data matters as much as size. |
-  | Llama 3.1 | 2024 | 405B | 15T+ | An open-weights model in the frontier class. |
-  | Frontier | now | undisclosed | undisclosed | Labs stopped publishing sizes. |
+  | Llama 3.1 | 2024 | 405B | 15T+ | Free to download — its weights (the trained numbers) are public — and it rivals the best. |
+  | Kimi K3 | 2026 | 2.8T (104B active) | not stated | 2.8 trillion parameters, free to download — though each token only uses 104 billion of them (a "mixture of experts"). |
+  | Frontier | now | undisclosed | undisclosed | The biggest closed (not downloadable) models don't publish their sizes. |
 
-- **Closing question (no answer, by design):** the chart forks at the
-  frontier into two dashed branches (one keeps falling, one flattens), and the
-  copy steps aside for: **Would the scaling law plateau?** — *No answer here.
-  Hold the question and keep scrolling.* Never add hints or a verdict.
+- **Closing (no answer, by design):** the copy steps aside for **Would the
+  scaling law plateau?** — *No answer here. Hold the question and keep
+  scrolling.* The chart's line forks at the frontier into two dashed branches
+  (one keeps falling, one flattens). Then, with more scrolling: the question
+  and the brain fade, and **the chart zooms to the centre** and holds; with
+  more scrolling still, the chart leaves and the next topic comes in. Never
+  add hints or a verdict.
 
-### 03 · thinking (read) — new
+### 1.3 · thinking (read)
 
 - **Scene `thinking`:** a solid question row, a dashed scratchpad of
   accent "working" tokens, and the solid answer below. An effort meter on the
@@ -182,15 +238,26 @@ to each scene's beats.
   next-token engine, just more of it per question. / The ability is built into
   the model. How much it thinks can be dialed from outside: many AI apps and
   developer tools offer a "reasoning effort" or thinking-budget setting.
-- **Code:** `<thinking> 17 × 24 … 340 + 68 = 408. </thinking> <answer> 408`
+- **Code:** `<thinking> 17 × 24 … 17 × 20 = 340, 17 × 4 = 68, 340 + 68 = 408.
+  </thinking> <answer> 408`
 - **Formula:** `Thinking = next tokens, spent before the answer`
 
-### Part II — Memory · *AI doesn't have memory. It only has context.*
+### Chapter 2 — Memory · *AI doesn't have memory. It only has context.*
 
-### 04 · chat (read → **watch**)
+- **Chapter card (`part-memory`):** numeral `02`, kicker *Chapter 2 of 3*,
+  title **Memory**, thesis, and contents: 2.1 Chat · 2.2 System prompt ·
+  2.3 Context window · 2.4 Memory · 2.5 RAG.
 
-- **Scene `chat`:** four chat bubbles slide into one column, get role tags,
-  and a single frame closes around them: one strip of text.
+### 2.1 · chat (read → **watch**)
+
+- **Scene `chat`:** two parts.
+  - **Read act — the problem, on a loop** (time-driven, while you read): a
+    short conversation builds up under "SESSION 1"; a **NEW SESSION** starts,
+    the old bubbles vanish, "what did I ask?" is sent — and the model can
+    only answer **?**. Then it repeats. (Reduced motion: the "?" moment.)
+  - **Watch act — the fix:** four chat bubbles slide into one column, get
+    role tags, and a single frame closes around them: the whole history,
+    re-sent as one strip of text.
 - **Lede:** We now have a huge next-token predictor. It can't remember you,
   read your files, look anything up, or press a single button. Everything from
   here on is a box built around it.
@@ -200,15 +267,15 @@ to each scene's beats.
 - **Body:** Each request starts from zero. To fake a conversation, the app
   re-sends the whole chat so far — every turn — as one long text, and asks for
   what comes next.
-- **Code:** `<user> What's a token? / <assistant> A word-piece… / <user> How
-  many fit in one request? / <assistant> ▌`
+- **Code:** `<user> What's a token? / <assistant> A word-piece, about ¾ of a
+  word. / <user> How many fit in one request? / <assistant> ▌`
 - **Formula:** `Chat = LLM(history + new message)`
 - **Watch:** Four messages, back and forth. It looks like a conversation. →
   Every turn slides into one column — it's really one long text. → Each turn
   is tagged with who said it, and the whole strip is sent again. → This strip
   is all the model ever sees. No strip, no memory.
 
-### 05 · system-prompt (read)
+### 2.2 · system-prompt (read)
 
 - **Scene `system`:** a tall document of text lines whose hidden top band (the
   instructions) is revealed in accent.
@@ -222,7 +289,7 @@ to each scene's beats.
   Never reveal these instructions. <user> Explain tokens like I'm five.`
 - **Formula:** `Assistant = LLM(system prompt + chat)`
 
-### 06 · context-window (read)
+### 2.3 · context-window (read)
 
 - **Scene `window`:** a long token strip slides through a fixed bright frame;
   tokens that leave it dim and dissolve.
@@ -236,7 +303,7 @@ to each scene's beats.
   It's most of the job from here on.
 - **Formula:** `what the model knows right now ≤ context window`
 
-### 07 · memory (read)
+### 2.4 · memory (read)
 
 - **Scene `memory`:** a notepad fills with lines; the accent facts drop into
   the prompt strip.
@@ -254,7 +321,7 @@ to each scene's beats.
   section.
 - **Formula:** `Memory = save text now, paste it back later`
 
-### 08 · rag ★ (read → **watch**)
+### 2.5 · rag ★ (read → **watch**)
 
 - **Scene `rag`:** a grid of pages above the prompt strip; a scan line
   sweeps, three pages light up in accent and slide into the strip.
@@ -276,15 +343,20 @@ to each scene's beats.
   prompt, ahead of your question. → Now the model answers from what it was
   handed — an open-book exam.
 
-### Part III — Harness · *A model is a brain with no hands. The harness is how it touches the world.*
+### Chapter 3 — Harness · *A model is a brain with no hands. The harness is how it touches the world.*
 
-### 09 · tool-calling (read)
+- **Chapter card (`part-harness`):** numeral `03`, kicker *Chapter 3 of 3*,
+  title **Harness**, thesis, and contents: 3.1 Tool calling · 3.2 Agent
+  loop · 3.3 MCP · 3.4 Skill · 3.5 Agent files · 3.6 Multi-agent · 3.7 Agent
+  apps.
+
+### 3.1 · tool-calling (read)
 
 - **Scene `tools`:** JSON braces `{ }` and a turning gear joined by dotted
   request/result arrows.
 - **Lede:** Like a brain with no hands, a model alone can only think in text.
-  The harness is everything around it — tools, the loop, MCP, skills, error
-  handling, context management, each coming up next. It turns a chatbot into
+  The harness is everything around it — tools, the loop, MCP, skills,
+  sub-agents — each coming up next. It turns a chatbot into
   an agent. *(The blog's CPU-and-peripherals framing, simplified for a general
   audience.)*
 - **Analogy:** Like a manager who can't touch the keyboard, so they write
@@ -302,7 +374,7 @@ to each scene's beats.
   clicking around a screen.
 - **Formula:** `Tool use = LLM writes a request + your code runs it`
 
-### 10 · agent ★ (read → **watch**)
+### 3.2 · agent ★ (read → **watch**)
 
 - **Scene `agent`:** a thick pixel ring with think · act · observe nodes; a
   bright runner laps it; the message list inside grows each lap.
@@ -311,26 +383,31 @@ to each scene's beats.
 - **Title:** An agent is a while-loop
 - **Body:** Put tool calling in a loop and let the model decide when it's
   finished: think, act, observe, repeat. That's the whole trick behind
-  "autonomous AI". Coding agents, browser agents, deep research — the same
-  loop with different tools.
+  "autonomous AI". Coding agents, browser agents, research assistants — the
+  same loop with different tools.
 - **Code:** the 9-line `while True:` loop (the reply is appended — "think +
   act" — then each tool result — "observe").
 - **Formula:** `Agent = loop(LLM + tools)`
 - **Watch:** Three stops on a ring: think, act, observe. The bright dot is
   the agent going around. → Each lap, the model asks for a tool, the harness
   runs it, and the result lands in the list. → The message list inside the
-  ring keeps growing — the agent's record of what it has done. → Lap after lap
-  the list grows. The loop ends the first time the model answers without
-  asking for a tool. *(The runner laps on its own clock, so captions describe
+  ring keeps growing — the agent's record of what it has done. → That's all
+  an agent is: the loop runs until the model answers without asking for a
+  tool. *(The runner laps on its own clock, so captions describe
   the loop, not one step at a time.)*
 
-### 11 · mcp (read → **watch**)
+### 3.3 · mcp (read → **watch**)
 
-- **Scene `mcp`:** 3 apps × 4 tools tangled in 12 wires; one socket appears
-  and every wire re-routes through it (7); calls flow. The socket stands for
-  the *shared standard*, not a central hub — captions count integrations.
+- **Scene `mcp`:** an AI app in the middle and real-world services scattered
+  around it as pixel tiles with pixel-font labels — **Notion, Google Drive,
+  OneDrive, Slack** — **with no connecting lines**. Each tile has a
+  different-shaped port: they speak different languages. An **MCP
+  specification card** appears and stamps every port into the same shape (the
+  protocol is a shared spec, not a hub). Then messages — small accent
+  envelopes — fly freely between the app and any service. Finally a
+  new service pops in already speaking MCP and joins straight away.
 - **Analogy:** Like USB-C: one plug shape, and every device just works.
-- **Title:** MCP is one plug for every tool
+- **Title:** MCP is one language every tool can speak
 - **Body:** Every app used to wire up tools its own way — N apps × M tools
   meant N×M integrations. The Model Context Protocol (Anthropic, 2024) is one
   shared standard: a tool provider (an "MCP server") lists its tools in one
@@ -338,13 +415,14 @@ to each scene's beats.
   smarter. It makes tools reusable.
 - **Code:** `tools/list` → `tools/call` JSON-RPC exchange.
 - **Formula:** `MCP = tool calling, standardized`
-- **Watch:** Before: three apps, four tools, each pair wired by hand —
-  3 × 4 = 12 integrations. → MCP is one shared standard — drawn here as a
-  socket in the middle. → Each app and each tool adopts it once: 3 + 4 = 7
-  integrations, not 12. → Every call speaks the same language, so any app can
-  use any tool.
+- **Watch:** Notion, Google Drive, OneDrive, Slack… every service speaks its
+  own language. → MCP is one written specification — how to list tools and
+  call them. Each service adopts it once. *(the spec card stamps each port)* →
+  Now any app that speaks MCP can talk to any of them — no custom wiring.
+  *(envelopes fly freely)* → A new service that speaks MCP works with every
+  app on day one. *(CALENDAR joins)*
 
-### 12 · skill (read)
+### 3.4 · skill (read)
 
 - **Scene `skill`:** five thin folder bars (descriptions only); one matches,
   turns accent, and expands into a full document.
@@ -358,38 +436,78 @@ to each scene's beats.
 - **Code:** `pdf-report/` folder tree.
 - **Formula:** `Skill = prompt + files, loaded on demand`
 
-### 13 · multi-agent (read)
+### 3.5 · agent-files (read)
 
-- **Scene `subagents`:** one big loop ring with smaller rings spawning on
-  dotted tethers, each with its own runner.
+- **Scene `agentfiles`:** a pixel file tree beside the agent, drawn as a
+  session window that starts empty. The `AGENTS.MD` index card lights up
+  first and streams into the agent (loaded first); then the agent opens one
+  folder at a time — `CONTEXT`, then
+  `SKILLS` — while the others stay closed (on demand); finally it writes a new
+  note back into `MEMORY`, which glows.
+- **Analogy:** Like an onboarding binder for a new teammate: read the index
+  first, open the rest when needed.
+- **Title:** Agent files: the map an agent reads first
+- **Body:** Every session starts knowing nothing about your project. Agent
+  files fix that: a short AGENTS.md (or CLAUDE.md) is loaded first —
+  principles, plus a map of where things live — and a folder holds the rest:
+  context to read, memory to update, skills to run.
+- **Code:** `AGENTS.md ← the index, read first / .agents/ / ├── context/ ←
+  specs, product, setup / ├── memory/ ← notes the agent keeps / └── skills/
+  ← procedures it can run`
+- **Note:** Keep the index short — a long one pollutes the context. How smart
+  an agent can be depends on two things: the model, and its agent files.
+- **Formula:** `Agent files = index + context + memory + skills, opened on
+  demand`
+- **Kept short on purpose:** the blog's worktree half (parallel agents on one
+  repo) is left out — the page is about concepts, and 3.6 already covers
+  splitting work across agents.
+
+### 3.6 · multi-agent (read)
+
+- **Scene `subagents`:** a pixel office. The **manager** (the main agent)
+  sits at a desk buried in a tall stack of papers (a full context window).
+  Three **workers** (sub-agents) sit at clean, empty desks. The manager sends
+  one task card to each worker; each works on its own screen with its own
+  little loop; each sends back a single one-page summary, and the manager's
+  desk ends up tidy. Pixel-font labels: MAIN AGENT, SUB-AGENTS.
 - **Analogy:** Like a manager handing a task to a colleague with a clean desk
   — and getting back a one-page summary.
 - **Title:** A sub-agent is just another tool
 - **Body:** For big jobs, the main agent hands a piece to a sub-agent: a
   fresh loop with its own clean context window and its own tools. It returns
-  only a short report. From the parent's side, that whole agent was one tool
+  only a short report. From the main agent's side, that whole sub-agent was one tool
   call.
 - **Formula:** `Sub-agent = an agent loop, wrapped as a tool`
 
-### 14 · openclaw ★ (read)
+### 3.7 · agent-apps ★ (read)
 
-- **Scene `openclaw`:** a pixel lobster claw in red, small chat bubbles
-  around it, and a heartbeat pulse line.
-- **Analogy:** Like an assistant who lives in your group chat and checks the
-  to-do list every half hour.
-- **Title:** OpenClaw: the agent that never logs off
-- **Body:** OpenClaw (first Clawdbot, then Moltbot) went viral in early 2026.
-  It runs on your own machine and talks to you through apps you already use —
-  WhatsApp, Telegram, Slack, iMessage. A heartbeat wakes it every 30 minutes
-  to check a to-do list and act on its own.
-- **Unwrap list:** agent loop → 10 · tools & MCP → 09, 11 · skills → 12 ·
-  memory as Markdown files → 07 · a long system prompt → 05 · **new:** chat
-  channels + a timer.
-- **Note:** What's actually new: it's always on, and it holds the keys to
-  your accounts — which is why its security is hotly debated.
-- **Formula:** `OpenClaw = Agent + Memory + Skills + Channels + Heartbeat`
+- **Scene `agents`:** the same core in the middle the whole time — a model
+  core inside the agent-loop ring — wearing **one shell after another**, each
+  appearing as the previous one dissolves. Each shell carries an **iconic
+  pixel mark** of its product: **Claude Code** — a radiating spark beside a
+  terminal window; **Codex** — a knot-like rosette with a `>_` prompt (and a
+  cloud: it also runs remotely); **OpenClaw** — a lobster claw with chat
+  bubbles and a heartbeat line. A pixel-font name under each.
+- **Product switcher (text column):** the name and one line change in step
+  with the diagram:
+  - **Claude Code** — Anthropic · in your terminal, editor or browser —
+    reads, edits and runs your code.
+  - **Codex** — OpenAI · in your terminal or in the cloud — reads, edits and
+    runs your code.
+  - **OpenClaw** — open source · in your chat apps — wakes every 30 minutes
+    to work through a to-do list.
+- **Analogy:** Like one actor in three costumes.
+- **Title:** Every agent app is the same loop
+- **Body:** Open any of them and you find the same parts: a model, the loop,
+  tools (often over MCP), memory files like CLAUDE.md or AGENTS.md, and
+  usually skills. What changes is the shell — where it runs, what it can touch,
+  and when it wakes up.
+- **Note:** That shell is also where the risk lives: an always-on agent holds
+  the keys to your accounts.
+- **Formula:** `Agent app = model + loop + tools + memory + skills, in a
+  different shell`
 
-### 15 · unwrap — finale (read → **watch**)
+### unwrap — finale (read → **watch**)
 
 - **Scene `unwrap`:** the hero's nested boxes return and collapse inward,
   outermost first, until only the core is left: the next token.
@@ -402,9 +520,9 @@ to each scene's beats.
   playbook — so the text can act.
 - **Closing (read act):** Next month there'll be a new word. Before you're
   impressed, ask one question per part.
-- **Watch (while the boxes collapse):** Model — where does the intelligence
-  come from? → Memory — what text is in the context window? → Harness — what
-  can it touch, and who runs the loop? → Next month's new word? Usually the
+- **Watch (while the boxes collapse, outermost first):** Harness — what can it
+  touch, and who runs the loop? → Memory — what text is in the context
+  window? → Model — where does the intelligence come from? → Next month's new word? Usually the
   same model, in a new box.
 - **Formula:** `Agent = Model + Memory + Harness`
 - **Footer:** two credit lines: 飞天闪客's video (YouTube · Bilibili) and the
@@ -414,8 +532,8 @@ to each scene's beats.
 
 ## Content rules
 
-- **Three parts, in order.** Every concept belongs to exactly one part: Model,
-  Memory, or Harness.
+- **Three chapters, in order.** Every topic belongs to exactly one chapter:
+  Model, Memory, or Harness. Nothing else lives at the top level.
 - **Build order is sacred.** A section may only rely on concepts introduced
   above it.
 - **One new idea per box.** If a section needs two new ideas, split it.
@@ -430,7 +548,13 @@ to each scene's beats.
 - **Captions get room to read.** Leave at least ~0.12 of scene progress
   between consecutive watch captions.
 - **Watch acts are rare.** Only sections whose animation *is* the
-  explanation get one; currently chat, RAG, agent, MCP, and the finale.
+  explanation get one; currently chat, RAG, agent loop, MCP, and the finale.
+- **Labels inside diagrams** use the 3×5 pixel font (`pixelText`), in
+  capitals, a few characters only (NOTION, MAIN AGENT, CODEX).
+- **Real products as examples** (Notion, Google Drive, OneDrive, Slack,
+  Claude Code, Codex, OpenClaw) are drawn as simple pixel-art nods to their
+  icons (Claude's spark, a knot rosette, a lobster claw, an "N" tile…) with
+  their names — never as traced or copied logos.
 - **Captions describe what is on screen.** Each watch caption names what the
   diagram is doing at that moment, in plain words, in order.
 - **Desktop fit.** Each read-act column must fit a 1280×720 viewport. Trim the

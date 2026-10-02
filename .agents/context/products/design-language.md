@@ -19,7 +19,8 @@ silhouettes (sparse print-style dots and checker textures on paper). Both are
 
 **What it means.** The single fixed, full-screen canvas behind the page. It
 draws every scene as a grid of square "cells". Each cell shows one quantized
-square, sized by intensity. Nothing else on the page draws pixels.
+mark, sized by intensity (squares, dashes or crosses by chapter; see
+**Chapters**). Nothing else on the page draws pixels.
 
 **Reference:** [`src/engine/PixelField.tsx`](../../../src/engine/PixelField.tsx)
 
@@ -28,8 +29,9 @@ Each frame:
 1. Pick the current section's scene, and the next one while it slides in.
 2. Paint each into a grid-resolution [`Raster`](../../../src/engine/raster.ts)
    (two channels: `ink` and `acc`).
-3. Combine with the **dissolve**, apply the **ghost** brightness, and add
-   **dust** and the **pointer halo**.
+3. Clip each to its art box, combine with the **dissolve** (topics) or
+   **wipe** (chapters), apply the act's visibility, and add **dust** and the
+   **pointer halo**.
 4. Draw with the **halftone** renderer.
 
 **Key knobs.** `BASE_CELL_DESKTOP` = 9px and `BASE_CELL_MOBILE` = 7px in
@@ -40,9 +42,9 @@ and `POINTER_RADIUS` are in `PixelField.tsx`.
 
 **What it means.** The canvas is divided into `cell`-px squares, centred in
 the viewport. Scenes paint in **grid units** (1 unit = 1 cell), never in CSS
-px, so they render at any resolution. A scene may ask for a different cell
-size via `scene.cell(p, base)`. This is how the scaling law gets literally
-finer as the model grows.
+px, so they render at any resolution. Every scene paints at the base cell
+size. (The optional `scene.cell(p, base)` hook is still consulted by
+`PixelField.tsx` and `debug.ts`, but no scene defines it.)
 
 ## Art box
 
@@ -51,12 +53,14 @@ in cells). It moves with the section's act:
 
 | Act | Desktop box (fractions of the viewport) |
 |-----|------------------------------------------|
-| Headline / Read, diagram **right** | x .52–.94, y .13–.87 |
-| Headline / Read, diagram **left** | x .06–.48, y .13–.87 |
+| Read, diagram **right** | x .52–.94, y .13–.87 |
+| Read, diagram **left** | x .06–.48, y .13–.87 |
 | Watch (**focus**) | x .08–.92, y .075–.795 — centred, larger; the strip below is for captions |
+| Hero (**center**) | x .015–.965, y .06–.98 — on every screen size; the frames sit around `heroHole` inside it |
 
-On mobile the box always stays in the top band (y 7.5–44.5%) — no focus
-glide; watch captions flow as a list under a clear window.
+On mobile the box (except the hero's) always stays in the top band
+(y 7.5–44.5%) — no focus glide; watch captions flow as a list under a clear
+window.
 `state.full` is the whole grid, for scenes that need the entire screen (the
 scaling question beat). The box glides between positions, so scenes must
 compose relative to `box`, never to fixed cells.
@@ -64,51 +68,98 @@ compose relative to `box`, never to fixed cells.
 **Reference:** `artRect()` / `grid()` / `toGrid()` in
 [`src/engine/layout.ts`](../../../src/engine/layout.ts).
 
+## Hero
+
+**What it means.** The opener: a centred headline framed by seven concentric
+pixel rectangles that step out from just around the text to the screen
+edges. The innermost frame carries accent corner brackets; the core stays
+empty, because the headline is the model. The frames hug `heroHole`, the
+headline's real extent, which `Hero.tsx` re-measures on resize and font
+load. Scrolling peels them off outward.
+
+- **Buzzword stickers.** `HERO_WORDS` are pixel stickers *scattered* around
+  the headline (seeded best-candidate sampling, so the same scatter on every
+  visit, never touching the headline, the HUD or each other; on small
+  screens the lowest-priority ones are left out). Each floats in place and
+  is a button that jumps to the section that explains it (`to`).
+- **Intro.** The loader fills 16 pixel cells (fonts ready, ~1.1s minimum),
+  then collapses into one square and fades. As the fade starts (`intro.at`),
+  the stickers **burst** out of the headline's centre (staggered, overshooting).
+  Scrolling pulls them back in, one after another. Reduced motion: no burst,
+  no float.
+
+**Reference:** [`Hero.tsx`](../../../src/components/Hero.tsx),
+[`Loader.tsx`](../../../src/components/Loader.tsx),
+[`scenes/hero.ts`](../../../src/engine/scenes/hero.ts), `heroHole` in
+`layout.ts`, `intro` / `BURST` in
+[`intro.ts`](../../../src/engine/intro.ts).
+
+## Chapters
+
+**What it means.** The page has exactly three chapters, **Model**, **Memory**
+and **Harness**, and every topic nests inside one (numbered `2.3`). Each
+chapter has:
+
+- a **chapter card** (`kind: 'part'`, [`ChapterCard.tsx`](../../../src/components/ChapterCard.tsx)):
+  a full-screen card in the chapter's signature colour, with a giant pixel
+  numeral, the chapter name, its thesis, and a clickable contents list. There
+  is no diagram. It **holds** for ~70% of its scroll (the *buffer*), then lifts away;
+- a **colour family** (Model: paper + green; Memory: sand + blue; Harness:
+  graphite + orange);
+- a **mark**: mid-tone halftone cells are drawn as squares (Model), dashes
+  (Memory) or crosses (Harness). Solid cells are always full squares. See
+  `CHAPTERS` in `sections.ts` and `MARK` in `halftone.ts`.
+
+Switching chapters uses a left → right pixel **wipe**; switching topics inside
+a chapter uses the blocky **dissolve** (`PixelField.tsx`).
+
 ## Acts: headline → read (→ watch)
 
-**What it means.** Every section after the hero scrolls through acts, so the
-reader looks at one thing at a time:
+**What it means.** Every topic scrolls through acts, so the reader looks at
+one thing at a time:
 
-1. **Headline** — the centred *headline card* alone; the diagram is a
-   *ghost* (16% brightness).
+1. **Headline** — the centred *headline card* alone on a clean background.
+   **No diagram at all**; it fades in only as the text arrives.
 2. **Read** — the text column beside the diagram (sides *alternate*). In
-   read-only sections the diagram's story plays here, while you read.
-3. **Watch** — **only for key sections** (those with `watch` captions:
-   chat, RAG, agent, MCP, finale). The column slides out, and the diagram
-   glides to the centre (*focus*), grows, and plays its story with *watch
-   captions*. Not every animation needs its own stage.
+   read-only topics the diagram's story plays here; afterwards the last frame
+   holds before the next topic (the *buffer*).
+3. **Watch** — **only for key topics** (those with `watch` captions: chat,
+   RAG, agent loop, MCP, finale). The column slides out, and the diagram glides
+   to the centre (*focus*), grows, and plays with *watch captions*.
 
 **Reference:** timings in [`src/engine/phases.ts`](../../../src/engine/phases.ts)
-(`PHASES.read`, `PHASES.watch`, `PHASES.scaling`; `modeOf(section)`). The
-ticker module writes them to `:root` at load as `--ph-<mode>-<phase>-a/b`
-(plus the scaling stage's beats from `SCALING.phases` as
-`--ph-scaling-<beat>`). Each section gets
-a `mode-*` class that maps them to local variables (`--h-*`, `--ri-*`,
-`--ro-*`, `--sc-*`). Scene progress is remapped to the act where the story
-plays (`sceneProgress()`).
+(`PHASES.part`, `.read`, `.watch`, `.scaling`; `modeOf()`, `visibility()`,
+`placement()`). The ticker module writes them to `:root` at load as
+`--ph-<mode>-<phase>-a/b` (plus the scaling stage's beats from
+`SCALING.phases` as `--ph-scaling-<beat>`). Each section gets a `mode-*`
+class that maps them to local variables (`--h-*`, `--ri-*`, `--ro-*`,
+`--sc-*`).
+
+## Clipping
+
+**What it means.** Every scene is clipped to its art box (+1 cell) before
+blending, so a diagram can never overlap the text column. A scene may return
+`unclipped(p) = true` only when no text sits beside it. The only user is the
+scaling stage's centred ending.
 
 ## Headline card
 
-**What it means.** The centred opener of every section: optional part label
-and part thesis (first section of each part) → kicker → huge title (Archivo
-78% width, ~6.4vw) → "In plain words" analogy.
+**What it means.** The centred opener of every topic: number + kicker
+(`2.3 · Context window`) → huge title (Archivo 78% width, ~6.4vw) → "In plain
+words" analogy, on a clean background. Chapter openers use the chapter card
+instead.
 It owns the screen for the first ~10% of the section, then lifts away.
 
 **Reference:** `HeadlineCard` in
 [`src/components/Section.tsx`](../../../src/components/Section.tsx); `.card`
 in `global.css`.
 
-## Ghost
-
-**What it means.** A scene drawn at low brightness behind the headline card
-(`GHOST` = 0.16 in `PixelField.tsx`). The halftone turns it into sparse fine
-dots, a hint of what's coming that never competes with the title.
-
 ## Alternating sides
 
 **What it means.** Concept sections alternate the diagram's side in the read
-act: right, left, right… (assigned in `sections.ts` after the list). The text
-column takes the other side and exits toward its own edge.
+act: right, left, right… (assigned in `sections.ts` after the list), restarting
+on the right at each chapter card. The text column takes the other side and
+exits toward its own edge.
 
 ## Watch captions
 
@@ -122,8 +173,8 @@ The formula chip appears at the end. Captions must describe what is
 
 ## Halftone levels
 
-**What it means.** An intensity 0..1 becomes one of five square sizes:
-`LEVELS = [0, .24, .42, .64, 1]` × cell. Values between two levels are
+**What it means.** An intensity 0..1 becomes one of five mark sizes:
+`LEVELS = [0, .24, .42, .64, 1]` × cell (mid-tones take the chapter's mark). Values between two levels are
 **ordered-dithered** with a 4×4 Bayer matrix. That produces the checker and
 dot textures of print halftone. Level 4 fills the whole cell, so dense areas
 merge into solid pixel blocks.
@@ -154,50 +205,71 @@ system band.
 
 ## Scene
 
-**What it means.** A pure painter, one per section, in
-`src/engine/scenes/<id>.ts`, registered in
-[`scenes/index.ts`](../../../src/engine/scenes/index.ts).
+**What it means.** A pure painter, one per section (the chapter cards share
+the intentionally empty `part`), in `src/engine/scenes/<id>.ts`, registered
+in [`scenes/index.ts`](../../../src/engine/scenes/index.ts).
 
 ```ts
 type Scene = {
   paint(s: { r: Raster; box: Box; full: Box; p: number; t: number; cell: number; mobile: boolean }): void;
-  cell?: (p: number, base: number) => number;
+  unclipped?: (p: number) => boolean; // true = paint the whole screen at p (see Clipping)
+  cell?: (p: number, base: number) => number; // unused: no scene defines it
 };
 ```
 
 - `p` is the **scene progress**: the section's sticky progress remapped by
   `sceneProgress()` to the act where the story plays (`PHASES[mode].scene`);
   raw section progress on mobile, or the steps-list position for mobile
-  watch sections. **p = 0 must be a complete composition**: it is shown
-  through the headline act (as a ghost), during the dissolve in, and — for
-  watch sections — through the whole read act. Spread the story across
-  ~0..0.9.
+  watch sections. **p = 0 must be a complete composition**: on desktop it is
+  the frame shown as the diagram fades in with the read act (nothing, not
+  even a ghost, shows behind a headline card) and, for watch sections, the
+  one held through the whole read act. On mobile, where the art band stays
+  at full strength, it is also the frame shown while a section dissolves
+  in. Spread the story across ~0..0.9.
 - `t` is time in seconds, frozen at 0 under reduced motion. Motion is
-  ambient; the meaning must survive `t = 0`.
+  ambient; the meaning must survive `t = 0`. The exception is **chat**: at
+  p = 0 (its read act) it loops the forgetful new-session story on `t`
+  every 9s, and at `t = 0` it holds the "?" frame.
 - Budget: **≤ 1.5 ms per paint** on the desktop grid.
 
 **Tools.** Helpers in
 [`scenes/helpers.ts`](../../../src/engine/scenes/helpers.ts) (`space`,
 `fillRound`, `strokeRound`, `line`, `textLines`, `dust`, `field`,
-`nestedBoxes`, …). In dev, `window.__scene(id, { p, t, mobile })` prints an
+`nestedBoxes`, …). In dev, `window.__scene(id, { p, t, mobile })` returns an
 ASCII render of the art box, and `window.__sceneBench(id, { p })` times a
 paint. See [`src/engine/debug.ts`](../../../src/engine/debug.ts).
 
 ## Dissolve
 
-**What it means.** The transition between two scenes. While the next section
-slides up one viewport height (`blend` 0→1), each cell flips from scene A to
-scene B. Each cell flips when its own noise threshold is crossed. The noise is
-62% **4×4-block** noise and 38% per-cell noise, so the image breaks apart in
-pixel chunks rather than cross-fading.
+**What it means.** The transition between two sections in the same chapter.
+While the next section slides up one viewport height (`blend` 0→1), each cell
+flips from scene A to scene B. Each cell flips when its own noise threshold is
+crossed. The noise is 62% **4×4-block** noise and 38% per-cell noise, so the
+image breaks apart in pixel chunks rather than cross-fading. On desktop the
+incoming topic opens on its headline card (no diagram), so the old diagram
+breaks apart into a clean background.
 
 **Key knob.** `EDGE` (0.28) sets the width of the soft front.
 
+## Chapter wipe
+
+**What it means.** The transition whenever the chapter changes (hero →
+Model, Model → Memory, Memory → Harness, Harness → finale). Same flip rule as
+the dissolve, but the threshold is 82% horizontal position plus 18%
+**2×2-block** noise, so a ragged pixel front sweeps **left → right**. The
+background splits at the front: the new chapter's colour fills in behind it
+(left), the old one stays ahead of it (right), instead of the usual colour
+blend. Each cell takes the new chapter's halftone mark as it flips.
+
+**Reference:** the `wipe` branch in
+[`PixelField.tsx`](../../../src/engine/PixelField.tsx).
+
 ## Dust
 
-**What it means.** Sparse, slowly twinkling print speckle across the whole
-field (~0.9% of cells). It keeps empty areas feeling like paper rather than a
-void.
+**What it means.** Sparse, slowly twinkling print speckle across the field
+(~0.9% of cells). It keeps empty areas feeling like paper rather than a
+void. On desktop it skips the zone where the page text currently sits
+(`textZone()` in `PixelField.tsx`), so it never reads as stray punctuation.
 
 ## Pointer halo
 
@@ -222,13 +294,13 @@ It never hard-blinks: on/off blinking distracts from reading.
 ## Nested boxes
 
 **What it means.** The page's signature motif: concentric 1-cell square
-outlines around a solid blinking core (the model). They appear in the
-**hero**, where the boxes peel off outward, and in the **finale**, where they
-collapse inward to the core.
+outlines around a solid blinking core (the model). Only the **finale** draws
+them: they collapse inward, outermost first, until only the core is left. The
+hero has its own variant: rectangles framing the headline (see **Hero**).
 
 **Reference:** `nestedBoxes()` in
-[`scenes/helpers.ts`](../../../src/engine/scenes/helpers.ts); used by
-`hero.ts` and `unwrap.ts`.
+[`scenes/helpers.ts`](../../../src/engine/scenes/helpers.ts); used only by
+`unwrap.ts`.
 
 ## Color journey
 
@@ -236,17 +308,16 @@ collapse inward to the core.
 model:
 
 ```
-Model:   paper #F2EFE7 → cream #ECE8DD → [GREEN #5DCB8A] → #E9E3D5
-Memory:  sand #E6DFCF → #DED5C1 → #D4CAB4 → #C9BEA4 → [BLUE #8FB4E3]
-Harness: stone #9C9585 → [ORANGE #E8582A] → graphite #55524C → #3B3934 → #2A2825
-         → [LOBSTER #181614 + red pixels]
-Finale:  night #0A0A09
+Hero:      paper #F2EFE7
+Chapter 1: [GREEN card] → #EEEAE0 → [GREEN scaling] → #E9E5DA        accent green
+Chapter 2: [BLUE card]  → #E8E1D1 → #E0D7C3 → #D7CDB7 → #CDC2A8 → [BLUE RAG]   accent blue
+Chapter 3: [ORANGE card] → #5A564E → [ORANGE agent] → #4A4740 → #3D3B36 → #36342F → #302E2A → #1C1A17   accent orange
+Finale:    night #0A0A09
 ```
 
-- **Highlight sections** (brackets) break the gradient on purpose: Scaling
-  Law, RAG, Agent, and OpenClaw. They get a bordered kicker square and a
-  heavier rail tick.
-- **Ink flips** from dark to light at MCP (§11). During a blend, the ticker
+- **Signature colours** (brackets): each chapter card, plus the chapter's key
+  topic (Scaling law, RAG, Agent loop), uses the chapter colour full-bleed.
+- **Ink flips** from dark to light at the Harness chapter. During a blend, the ticker
   shows whichever section's ink contrasts more with the current background,
   so text is never mid-grey on mid-grey.
 - **Contrast floor:** body text ≥ 4.5:1 against its own section background.
@@ -283,6 +354,15 @@ model.
 **Reference:** `StackTrail` in
 [`src/components/Hud.tsx`](../../../src/components/Hud.tsx).
 
+## Back to top
+
+**What it means.** A small pixel-font "Top" button, bottom-right, that
+appears once you have scrolled ~80% of a viewport and jumps back to the hero.
+
+**Reference:** `BackToTop` in
+[`src/components/Hud.tsx`](../../../src/components/Hud.tsx); `.totop` in
+`global.css`.
+
 ## Typography
 
 | Role | Face | Notes |
@@ -290,7 +370,25 @@ model.
 | Display & titles | Archivo (variable width) | titles `font-stretch: 84%`, weight ~680; hero 70% / 800, uppercase |
 | Body | Archivo | 15.5–17.5px, `text-wrap: pretty` |
 | Labels, code, HUD | JetBrains Mono | uppercase labels with 0.1–0.14em tracking |
-| Numerals & part labels | Silkscreen | the pixel font — parameter counter, step numbers, part tags, wordmark |
+| Numerals & chapter labels | Silkscreen | the pixel font — parameter counter, step numbers, chapter numerals, stickers, wordmark |
+
+## Pixel font
+
+**What it means.** A 3×5 bitmap font for **labels inside diagrams**
+(NOTION, MAIN AGENT, CODEX…), drawn cell-aligned so it stays crisp.
+Capitals, digits and a few symbols.
+
+**Reference:** `pixelText()` / `pixelTextWidth()` in
+[`scenes/helpers.ts`](../../../src/engine/scenes/helpers.ts).
+
+## Product switcher
+
+**What it means.** In *Agent apps* (3.7), the text column shows one product
+at a time (Claude Code → Codex → OpenClaw). It changes in step with the
+diagram, whose shell dissolves into the next while the core loop stays put.
+Data: `products: [{ at, name, by, where }]`, timed on scene progress like
+watch captions; the diagram is the `agents` scene
+([`scenes/agents.ts`](../../../src/engine/scenes/agents.ts)).
 
 ## Adding a new term
 

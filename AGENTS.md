@@ -56,14 +56,16 @@
 
 **From LLM to Agent** is a single-page, scroll-linked explainer of AI
 industry concepts for a general audience. It unwraps each buzzword as **one
-more box around the same model**, in three parts:
+more box around the same model**, in exactly three chapters, each opened by a
+full-screen chapter card:
 
 - **Model:** where the intelligence comes from (next token, scaling law,
   thinking).
 - **Memory:** AI doesn't have memory, only context (chat, system prompt,
   context window, memory, RAG).
 - **Harness:** how AI touches the world (tool calling, agent loop, MCP,
-  Skill, multi-agent, OpenClaw).
+  Skill, agent files, multi-agent, agent apps: Claude Code · Codex ·
+  OpenClaw).
 
 - **Visual language:** a pixel/halftone canvas (the *Pixel Field*) that
   morphs scene to scene as you scroll. The color journey runs light → dark as
@@ -83,7 +85,7 @@ more box around the same model**, in three parts:
 | `index.html` | Vite entry; font links. |
 | `src/content/` | All page copy, analogies, watch captions, UI labels and palettes (`sections.ts`). The page has no reference list; fact sources live in `.agents/context/products/references.md`. |
 | `src/engine/` | Ticker (scroll + palette), Pixel Field canvas, halftone renderer, scenes. |
-| `src/components/` | Section layouts and HUD (top bar, progress rail, stack trail). |
+| `src/components/` | Hero, chapter cards, section layouts, loader, and HUD (top bar, progress rail, stack trail, back-to-top). |
 | `src/styles/` | Global CSS: tokens, layout, reveal rules, responsive rules. |
 | `.agents/skills/` | Open-format reusable workflows. |
 | `.agents/agents/` | Reserved for future provider-neutral subagent definitions; currently empty. |
@@ -103,7 +105,7 @@ more box around the same model**, in three parts:
 
 | Topic | File |
 |-------|------|
-| **Content design** — thesis, parts, every section's copy/scene/palette | [`.agents/context/products/content-outline.md`](.agents/context/products/content-outline.md) |
+| **Content design** — thesis, chapters, every section's copy/scene/palette | [`.agents/context/products/content-outline.md`](.agents/context/products/content-outline.md) |
 | Design language — Pixel Field, halftone, dissolve, color journey | [`.agents/context/products/design-language.md`](.agents/context/products/design-language.md) |
 | Fact sources | [`.agents/context/products/references.md`](.agents/context/products/references.md) |
 

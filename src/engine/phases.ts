@@ -1,8 +1,9 @@
 /**
  * Section phases — the single source of timing for each section's scroll.
  *
- * Every section after the hero opens with a centred HEADLINE card (the
- * diagram is a dim ghost), then a READ act: the text column beside the
+ * Chapter openers (kind 'part') are one full-screen card that holds, then
+ * leaves. Every topic opens with a centred HEADLINE card on a clean
+ * background (no diagram), then a READ act: the text column beside the
  * diagram, whose story plays as you read.
  *
  * Only the important sections add a WATCH act (they have `watch` captions):
@@ -21,28 +22,34 @@ type Span = readonly [number, number];
 type Timing = { headOut: Span; readIn: Span; readOut?: Span; focus?: Span; scene: Span };
 
 export const PHASES = {
-  /** headline → read; the scene's story plays while you read */
+  /** chapter opener: the card holds for most of the scroll (the buffer), then leaves */
+  part: {
+    headOut: [0.7, 0.86],
+    readIn: [2, 2],
+    scene: [0, 1],
+  },
+  /** headline → read; the story plays while you read, then a still hold before the next topic */
   read: {
-    headOut: [0.08, 0.16],
-    readIn: [0.14, 0.22],
-    scene: [0.2, 0.9],
+    headOut: [0.12, 0.2],
+    readIn: [0.18, 0.26],
+    scene: [0.24, 0.84],
   },
   /**
    * headline → read → watch; the scene holds still while you read, then
-   * performs — its clock starts only once the glide and the caption strip
-   * have finished arriving, so the first caption gets real reading time.
+   * performs — its clock starts only once the glide and the caption strip have
+   * arrived, and it ends early so the last frame holds before the hand-off.
    */
   watch: {
-    headOut: [0.07, 0.13],
-    readIn: [0.12, 0.18],
-    readOut: [0.43, 0.49],
-    focus: [0.44, 0.55],
-    scene: [0.55, 0.95],
+    headOut: [0.1, 0.17],
+    readIn: [0.15, 0.22],
+    readOut: [0.46, 0.52],
+    focus: [0.47, 0.57],
+    scene: [0.57, 0.9],
   },
-  /** the scaling stage keeps its own timeline after its headline card */
+  /** the scaling stage keeps its own timeline (SCALING.phases) after its headline card */
   scaling: {
-    headOut: [0.035, 0.07],
-    readIn: [0.07, 0.1],
+    headOut: [0.025, 0.05],
+    readIn: [0.05, 0.075],
     scene: [0, 1],
   },
 } as const satisfies Record<string, Timing>;
@@ -51,6 +58,7 @@ export type Mode = keyof typeof PHASES;
 
 export function modeOf(s: Section): Mode | null {
   if (s.kind === 'hero') return null;
+  if (s.kind === 'part') return 'part';
   if (s.kind === 'scaling') return 'scaling';
   return s.watch ? 'watch' : 'read';
 }
@@ -92,8 +100,15 @@ export function writePhaseVars(style: CSSStyleDeclaration) {
   for (const [key, v] of Object.entries(SCALING.phases)) style.setProperty(`--ph-scaling-${key}`, String(v));
 }
 
-/** brightness of a scene while the headline card is up */
-const GHOST = 0.16;
+/**
+ * How visible the diagram is: nothing at all while a headline card is up
+ * (a ghost behind a title confuses), fading in as the text arrives.
+ */
+export function visibility(s: Section, p: number): number {
+  const t = timing(s);
+  if (!t) return 1;
+  return smoothstep(t.readIn[0], t.readIn[1], p);
+}
 
 /** Where a section's scene sits, what progress it sees, how bright it is. */
 export function placement(
@@ -105,14 +120,13 @@ export function placement(
   if (f.mobile) {
     // mobile: the art stays in the top band; WATCH scenes play while their steps are read
     const ms = f.mobileScene[index];
-    return { sec, side: 'right', focus: 0, sp: ms ?? p, light: 1 };
+    return { sec, side: sec.art === 'center' ? 'center' : 'right', focus: 0, sp: ms ?? p, light: 1 };
   }
-  const h = headline(sec, p);
   return {
     sec,
     side: sec.art ?? 'right',
     focus: focus(sec, p),
     sp: sceneProgress(sec, p),
-    light: 1 - (1 - GHOST) * h,
+    light: visibility(sec, p),
   };
 }

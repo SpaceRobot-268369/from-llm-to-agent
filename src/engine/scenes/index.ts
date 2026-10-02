@@ -12,8 +12,10 @@ import tools from './tools';
 import agent from './agent';
 import mcp from './mcp';
 import skill from './skill';
+import agentfiles from './agentfiles';
 import subagents from './subagents';
-import openclaw from './openclaw';
+import agents from './agents';
+import part from './part';
 import unwrap from './unwrap';
 
 export const SCENES: Record<SceneId, Scene> = {
@@ -30,7 +32,9 @@ export const SCENES: Record<SceneId, Scene> = {
   agent,
   mcp,
   skill,
+  agentfiles,
   subagents,
-  openclaw,
+  agents,
+  part,
   unwrap,
 };

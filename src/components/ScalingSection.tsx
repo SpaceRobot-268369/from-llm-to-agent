@@ -1,6 +1,6 @@
 import { useEffect, useRef, type CSSProperties } from 'react';
 import { SCALING, type Section as SectionData } from '../content/sections';
-import { lerp, smoothstep } from '../engine/noise';
+import { lerp, range, smoothstep } from '../engine/noise';
 import { growth } from '../engine/scenes/scaling';
 import { ticker } from '../engine/ticker';
 import { Formula } from './Formula';
@@ -8,6 +8,7 @@ import { HeadlineCard } from './Section';
 
 const MS = SCALING.milestones;
 const L = SCALING.labels;
+const PH = SCALING.phases;
 
 export function fmtShort(n: number): string {
   if (n >= 1e12) return `${+(n / 1e12).toFixed(1)}T`;
@@ -44,10 +45,12 @@ export function ScalingSection({ s, index }: { s: SectionData; index: number }) 
   const yearRef = useRef<HTMLElement>(null);
   const listRef = useRef<HTMLOListElement>(null);
   const dotRef = useRef<SVGRectElement>(null);
+  const chartRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     let lastActive = -1;
     let lastParams = '';
+    let lastZoom = '';
     return ticker.onFrame((f) => {
       if (f.cur !== index && f.next !== index) return;
       const p = f.progress[index];
@@ -93,6 +96,28 @@ export function ScalingSection({ s, index }: { s: SectionData; index: number }) 
       const pt = at(growth(p));
       dotRef.current!.setAttribute('x', (pt.x - 4).toFixed(1));
       dotRef.current!.setAttribute('y', (pt.y - 4).toFixed(1));
+
+      // the ending: question fades → the chart zooms to the centre and holds →
+      // the chart leaves → next topic. (Mobile hides the chart.)
+      const chart = chartRef.current!;
+      const z = smoothstep(PH.chartZoom, PH.chartZoomEnd, p);
+      const out = range(PH.chartOut, PH.chartOutEnd, p);
+      const zoomKey = `${z}|${f.vw}|${f.vh}`;
+      if (zoomKey !== lastZoom) {
+        if (z > 0) {
+          const parent = chart.offsetParent as HTMLElement | null;
+          const pw = parent?.clientWidth ?? f.vw;
+          const ph = parent?.clientHeight ?? f.vh;
+          const cx = chart.offsetLeft + chart.offsetWidth / 2;
+          const cy = chart.offsetTop + chart.offsetHeight / 2;
+          const scale = Math.max(1, Math.min(2.6, (pw * 0.62) / chart.offsetWidth, (ph * 0.62) / chart.offsetHeight));
+          chart.style.transform = `translate(${((pw / 2 - cx) * z).toFixed(1)}px, ${((ph / 2 - cy) * z).toFixed(1)}px) scale(${(1 + (scale - 1) * z).toFixed(3)})`;
+        } else {
+          chart.style.transform = '';
+        }
+        lastZoom = zoomKey;
+      }
+      chart.style.setProperty('--chart-out', out.toFixed(3));
     });
   }, [index]);
 
@@ -108,6 +133,7 @@ export function ScalingSection({ s, index }: { s: SectionData; index: number }) 
         <HeadlineCard s={s} />
         <div className="scaling__copy">
           <p className="kicker" aria-hidden="true">
+            {s.num ? `${s.num} · ` : ''}
             {s.kicker}
           </p>
           <p className="title" aria-hidden="true">
@@ -128,7 +154,7 @@ export function ScalingSection({ s, index }: { s: SectionData; index: number }) 
                 <li key={ms.model}>
                   <span className="ms__model">{ms.model}</span>
                   <span className="ms__year">{ms.year}</span>
-                  <span className="ms__params">{ms.params ? fmtShort(ms.params) : '?'}</span>
+                  <span className="ms__params">{ms.params ? fmtShort(ms.params) : L.unknown}</span>
                   <span className="ms__caption">{ms.caption}</span>
                 </li>
               ))}
@@ -158,7 +184,7 @@ export function ScalingSection({ s, index }: { s: SectionData; index: number }) 
           </dl>
         </div>
 
-        <figure className="scaling__chart" aria-hidden="true">
+        <figure className="scaling__chart" aria-hidden="true" ref={chartRef}>
           <svg viewBox="0 0 260 140" shapeRendering="crispEdges">
             <line x1="22" y1="8" x2="22" y2="122" className="axis" />
             <line x1="22" y1="122" x2="250" y2="122" className="axis" />

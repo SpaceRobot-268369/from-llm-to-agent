@@ -13,6 +13,7 @@ import { artRect, BASE_CELL_DESKTOP, BASE_CELL_MOBILE, grid, toGrid, type Side }
 import { Raster } from './raster';
 import { SCENES } from './scenes';
 import type { SceneId } from './scenes/types';
+import { ticker } from './ticker';
 
 type Opts = {
   p?: number;
@@ -95,11 +96,13 @@ declare global {
     __scene?: typeof ascii;
     __sceneBench?: typeof bench;
     __goto?: (id: string, progress: number) => void;
+    __ticker?: typeof ticker;
   }
 }
 
 export function installDebugHooks() {
   window.__scene = ascii;
+  window.__ticker = ticker;
   window.__sceneBench = bench;
   window.__goto = (id, progress) => {
     const el = document.getElementById(id);

@@ -3,15 +3,24 @@ import type { Box } from './scenes/types';
 export const BASE_CELL_DESKTOP = 9;
 export const BASE_CELL_MOBILE = 7;
 
-/** Which side the diagram sits on during the READ phase. */
-export type Side = 'left' | 'right';
+/** Which side the diagram sits on during the READ phase ('center' = the hero). */
+export type Side = 'left' | 'right' | 'center';
 
 type Rect = [number, number, number, number]; // x, y, w, h as fractions of the viewport
 
-const DESKTOP_SIDE: Record<Side, Rect> = {
+const DESKTOP_SIDE: Record<'left' | 'right', Rect> = {
   right: [0.52, 0.13, 0.42, 0.74],
   left: [0.06, 0.13, 0.42, 0.74],
 };
+/** the hero frames its centred headline on every screen size */
+const CENTER: Rect = [0.015, 0.06, 0.95, 0.92];
+
+/**
+ * The hero headline's region (fractions of the viewport), measured by the
+ * Hero component from the real text and read by the hero scene, so the pixel
+ * boxes frame the headline without ever touching it.
+ */
+export const heroHole = { x: 0.24, y: 0.28, w: 0.52, h: 0.44 };
 /** WATCH phase: centred and large; the bottom strip is left for captions */
 const DESKTOP_FOCUS: Rect = [0.08, 0.075, 0.84, 0.72];
 /** mobile: the art always stays in the top band (no focus glide) */
@@ -23,6 +32,7 @@ export function makeBox(x: number, y: number, w: number, h: number): Box {
 
 /** The art region in CSS px, interpolated from the side box to the focus box. */
 export function artRect(W: number, H: number, mobile: boolean, side: Side = 'right', focus = 0): Rect {
+  if (side === 'center') return [CENTER[0] * W, CENTER[1] * H, CENTER[2] * W, CENTER[3] * H];
   if (mobile) return [MOBILE_SIDE[0] * W, MOBILE_SIDE[1] * H, MOBILE_SIDE[2] * W, MOBILE_SIDE[3] * H];
   const a = DESKTOP_SIDE[side];
   const b = DESKTOP_FOCUS;

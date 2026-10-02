@@ -15,9 +15,13 @@ function parse(src: string): ReactNode[] {
   return out;
 }
 
-export function Formula({ text, at, className = '' }: { text: string; at?: number; className?: string }) {
+export function Formula({ text, at, className = '', ariaHidden }: { text: string; at?: number; className?: string; ariaHidden?: boolean }) {
   return (
-    <p className={`formula ${at !== undefined ? 'rv' : ''} ${className}`} style={at !== undefined ? ({ '--at': at } as CSSProperties) : undefined}>
+    <p
+      className={`formula ${at !== undefined ? 'rv' : ''} ${className}`}
+      style={at !== undefined ? ({ '--at': at } as CSSProperties) : undefined}
+      aria-hidden={ariaHidden || undefined}
+    >
       <code>{parse(text)}</code>
     </p>
   );

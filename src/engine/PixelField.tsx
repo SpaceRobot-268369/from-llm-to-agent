@@ -2,17 +2,22 @@
  * The Pixel Field: one fixed full-screen canvas behind the page.
  *
  * Each frame it paints the current section's scene (and, while the next
- * section slides in, the next scene) into grid-resolution rasters, dissolves
- * them together in blocky pixel chunks, adds dust and a soft pointer halo, then
- * draws everything as quantized halftone squares.
+ * section slides in, the next scene) into grid-resolution rasters, clips each
+ * to its art box (so diagrams never overlap text), blends them — a blocky
+ * dissolve between topics, a directional wipe between chapters — adds dust and
+ * a soft pointer halo, then draws quantized halftone marks in the chapter's
+ * mark shape (squares / dashes / crosses).
  *
- * Section phases (see phases.ts) decide where each scene sits: beside the
- * text, or centred and enlarged in the WATCH phase; and how bright it is —
- * a dim ghost while the headline card owns the screen.
+ * Section phases (see phases.ts) decide where each scene sits (beside the
+ * text, or centred in a WATCH act) and how visible it is (nothing while a
+ * headline card is up).
  */
 import { useEffect, useRef } from 'react';
 import { css } from './color';
-import { drawHalftone } from './halftone';
+import { heroHole } from './layout';
+import { drawHalftone, MARK } from './halftone';
+import { chapterOf, type Section } from '../content/sections';
+import type { Box } from './scenes/types';
 import { hash2 } from './noise';
 import { Raster } from './raster';
 import { SCENES } from './scenes';
@@ -26,6 +31,42 @@ const EDGE = 0.28;
 const POINTER_RADIUS = 90; // CSS px
 const POINTER_RATE = 3; // re-rolls per second
 const POINTER_STRENGTH = 0.22;
+/** cells of slack around the art box before clipping */
+const CLIP_MARGIN = 1;
+
+function markOf(s: Section): number {
+  return MARK[chapterOf(s)?.mark ?? 'square'];
+}
+
+/** Clip a raster to a box (+margin) in place. */
+function clip(r: Raster, b: Box) {
+  const x0 = Math.floor(b.x) - CLIP_MARGIN;
+  const y0 = Math.floor(b.y) - CLIP_MARGIN;
+  const x1 = Math.ceil(b.x + b.w) + CLIP_MARGIN;
+  const y1 = Math.ceil(b.y + b.h) + CLIP_MARGIN;
+  for (let y = 0; y < r.h; y++) {
+    const inY = y >= y0 && y < y1;
+    const row = y * r.w;
+    for (let x = 0; x < r.w; x++) {
+      if (inY && x >= x0 && x < x1) continue;
+      r.ink[row + x] = 0;
+      r.acc[row + x] = 0;
+    }
+  }
+}
+
+/** [x0, x1, y0, y1] in cells where the current section's text sits (dust-free). */
+function textZone(pl: ReturnType<typeof placement>, cols: number, rows: number): [number, number, number, number] | null {
+  const s = pl.sec;
+  if (s.kind === 'hero') {
+    return [heroHole.x * cols, (heroHole.x + heroHole.w) * cols, heroHole.y * rows, (heroHole.y + heroHole.h) * rows];
+  }
+  if (s.kind === 'part') return [cols * 0.12, cols * 0.9, rows * 0.15, rows * 0.85];
+  if (pl.light < 0.5) return [cols * 0.12, cols * 0.88, rows * 0.18, rows * 0.82]; // headline card
+  if (pl.focus > 0.5) return [cols * 0.18, cols * 0.82, rows * 0.8, rows]; // watch captions
+  return pl.side === 'left' ? [cols * 0.5, cols, 0, rows] : [0, cols * 0.5, 0, rows];
+}
+
 export function PixelField() {
   const ref = useRef<HTMLCanvasElement>(null);
 
@@ -36,6 +77,7 @@ export function PixelField() {
     const B = new Raster();
     let values = new Float32Array(0);
     let accent = new Uint8Array(0);
+    let marks = new Uint8Array(0);
     // draw at the canvas's own CSS size — innerWidth includes a classic
     // scrollbar, which would make the browser resample (blur) the squares
     let W = canvas.clientWidth;
@@ -73,21 +115,32 @@ export function PixelField() {
       if (values.length !== n) {
         values = new Float32Array(n);
         accent = new Uint8Array(n);
+        marks = new Uint8Array(n);
       }
 
       const common = { full, t: f.t, cell, mobile: f.mobile };
       const boxA = toGrid(artRect(W, H, f.mobile, pa.side, pa.focus), cell, offX, offY);
       A.clear();
-      sa.paint({ r: A, box: boxA, p: pa.sp, ...common });
+      if (pa.light > 0.001) {
+        sa.paint({ r: A, box: boxA, p: pa.sp, ...common });
+        if (!sa.unclipped?.(pa.sp)) clip(A, boxA);
+      }
       if (blending) {
         const boxB = toGrid(artRect(W, H, f.mobile, pb!.side, pb!.focus), cell, offX, offY);
         B.clear();
-        sb!.paint({ r: B, box: boxB, p: pb!.sp, ...common });
+        if (pb!.light > 0.001) {
+          sb!.paint({ r: B, box: boxB, p: pb!.sp, ...common });
+          if (!sb!.unclipped?.(pb!.sp)) clip(B, boxB);
+        }
       }
       const la = pa.light;
       const lb = pb ? pb.light : 1;
+      const markA = markOf(pa.sec);
+      const markB = pb ? markOf(pb.sec) : markA;
+      // a chapter change wipes left → right; a topic change dissolves in blocks
+      const wipe = !!pb && pa.sec.chapter !== pb.sec.chapter;
 
-      // combine: blocky dissolve from A to B
+      // combine
       const k = f.blend * (1 + EDGE);
       const ptr = f.pointer;
       const usePtr = ptr.on && !f.reduced && !f.mobile;
@@ -96,6 +149,8 @@ export function PixelField() {
       const pr = POINTER_RADIUS / cell;
       const pr2 = pr * pr;
       const tick = Math.floor(f.clock * POINTER_RATE);
+      // where page text sits right now: dust there reads like stray punctuation
+      const quiet = f.mobile ? null : textZone(pa, cols, rows);
       const dustTick = Math.floor(f.t * 0.7);
 
       for (let y = 0; y < rows; y++) {
@@ -105,8 +160,11 @@ export function PixelField() {
           const aa = A.acc[i];
           let v = (ai > aa ? ai : aa) * la;
           let acc = aa > ai;
+          let mark = markA;
           if (blending) {
-            const nz = 0.62 * hash2(x >> 2, y >> 2, 11) + 0.38 * hash2(x, y, 5);
+            const nz = wipe
+              ? 0.82 * (x / cols) + 0.18 * hash2(x >> 1, y >> 1, 23)
+              : 0.62 * hash2(x >> 2, y >> 2, 11) + 0.38 * hash2(x, y, 5);
             let w = (k - nz) / EDGE;
             w = w < 0 ? 0 : w > 1 ? 1 : w;
             if (w > 0) {
@@ -114,12 +172,15 @@ export function PixelField() {
               const ba = B.acc[i];
               const vb = (bi > ba ? bi : ba) * lb;
               v = v * (1 - w) + vb * w;
-              if (w > 0.5) acc = ba > bi;
+              if (w > 0.5) {
+                acc = ba > bi;
+                mark = markB;
+              }
             }
           }
           // dust: sparse print speckle across the whole field
           const dz = hash2(x, y, 97);
-          if (dz > 0.991) {
+          if (dz > 0.991 && !(quiet && x >= quiet[0] && x < quiet[1] && y >= quiet[2] && y < quiet[3])) {
             const d = hash2(x, y, 131 + dustTick) > 0.4 ? 0.3 : 0.12;
             if (d > v) {
               v = d;
@@ -137,15 +198,26 @@ export function PixelField() {
           }
           values[i] = v;
           accent[i] = acc ? 1 : 0;
+          marks[i] = mark;
         }
       }
 
-      ctx.fillStyle = css(f.colors.bg);
-      ctx.fillRect(0, 0, cw, ch);
+      if (wipe && blending) {
+        // the new chapter's colour sweeps in behind the wipe front
+        ctx.fillStyle = pa.sec.palette.bg;
+        ctx.fillRect(0, 0, cw, ch);
+        const front = Math.max(0, Math.min(1, (k - EDGE / 2 - 0.09) / 0.82));
+        ctx.fillStyle = pb!.sec.palette.bg;
+        ctx.fillRect(0, 0, Math.round(front * cw), ch);
+      } else {
+        ctx.fillStyle = css(f.colors.bg);
+        ctx.fillRect(0, 0, cw, ch);
+      }
       drawHalftone({
         ctx,
         values,
         accent,
+        marks,
         w: cols,
         h: rows,
         cell: cell * dpr,

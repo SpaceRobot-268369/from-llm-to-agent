@@ -118,6 +118,11 @@ class Ticker {
     return () => this.subs.delete(cb);
   }
 
+  /** Index of a section by id (-1 if unknown). */
+  indexOf(id: string): number {
+    return SECTIONS.findIndex((s) => s.id === id);
+  }
+
   /** Smooth-scroll to a section's start (or slightly into it). */
   scrollToSection(index: number, into = 0) {
     const rec = this.recs[index];
@@ -245,9 +250,11 @@ class Ticker {
       const pc = p < 0 ? 0 : p > 1 ? 1 : p;
       f.progress[i] = pc;
       if (f.mobile && rec.watch) {
-        // the steps list enters at the bottom → its end reaches mid-screen
+        // the steps list enters at the bottom → its top reaches the art band's
+        // lower edge (the scene finishes while it is still visible), and never
+        // later than the end of the page
         const a = rec.wTop - vh * 0.92;
-        const b = rec.wBottom - vh * 0.5;
+        const b = Math.min(rec.wTop - vh * 0.45, docH - vh);
         const m = b > a ? (y - a) / (b - a) : 0;
         f.mobileScene[i] = m < 0 ? 0 : m > 1 ? 1 : m;
       } else {
@@ -275,7 +282,9 @@ class Ticker {
     const A = PALETTES[cur];
     const B = next >= 0 ? PALETTES[next] : A;
     const k = f.blend;
-    const bg = mix(A.bg, B.bg, k);
+    // a chapter change wipes rather than cross-fades: no off-palette in-between
+    const chapterChange = next >= 0 && SECTIONS[cur].chapter !== SECTIONS[next].chapter;
+    const bg = chapterChange ? (k < 0.5 ? A.bg : B.bg) : mix(A.bg, B.bg, k);
     const ink = contrast(A.ink, bg) >= contrast(B.ink, bg) ? A.ink : B.ink;
     f.colors.bg = bg;
     f.colors.ink = ink;

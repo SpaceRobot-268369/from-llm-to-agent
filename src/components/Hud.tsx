@@ -3,13 +3,11 @@
  * through refs — no React state changes on scroll.
  */
 import { useEffect, useRef } from 'react';
-import { SECTIONS, UI } from '../content/sections';
+import { chapterOf, SECTIONS, UI } from '../content/sections';
 import { range } from '../engine/noise';
 import { placement } from '../engine/phases';
 import { ticker } from '../engine/ticker';
 
-const LAST = SECTIONS.length - 1;
-const pad2 = (n: number) => String(n).padStart(2, '0');
 
 export function TopBar() {
   const tokRef = useRef<HTMLElement>(null);
@@ -27,7 +25,13 @@ export function TopBar() {
         lastTok = tok;
       }
       if (f.cur !== lastCur) {
-        secRef.current!.textContent = `${pad2(f.cur)} / ${pad2(LAST)} · ${SECTIONS[f.cur].label}`;
+        const s = SECTIONS[f.cur];
+        const ch = chapterOf(s);
+        secRef.current!.textContent = ch
+          ? s.kind === 'part'
+            ? UI.chapter(ch.n, ch.name)
+            : `${UI.chapter(ch.n, ch.name)}  /  ${s.num} ${s.label}`
+          : s.label;
         lastCur = f.cur;
       }
     });
@@ -46,8 +50,10 @@ export function TopBar() {
           ticker.scrollToSection(0);
         }}
       >
-        llm<span aria-hidden="true">→</span>
-        <span className="sr-only"> to </span>agent
+        {UI.wordmark.from}
+        <span aria-hidden="true">→</span>
+        <span className="sr-only">{UI.wordmark.sr}</span>
+        {UI.wordmark.to}
       </a>
       <span className="topbar__r" ref={secRef} aria-live="off" />
     </header>
@@ -73,18 +79,21 @@ export function ProgressRail() {
 
   return (
     <nav className="rail" ref={navRef} aria-label={UI.railLabel}>
-      {SECTIONS.map((s, i) => (
-        <button
-          key={s.id}
-          type="button"
-          className={s.highlight ? 'is-highlight' : undefined}
-          onClick={() => ticker.scrollToSection(i, i === 0 ? 0 : 0.3)}
-          aria-label={`${pad2(i)} ${s.label}`}
-          title={`${pad2(i)} · ${s.label}`}
-        >
-          <i />
-        </button>
-      ))}
+      {SECTIONS.map((s, i) => {
+        const name = s.kind === 'part' ? UI.chapter(s.chapter ?? 0, s.label) : s.num ? `${s.num} ${s.label}` : s.label;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            className={s.kind === 'part' ? 'is-chapter' : s.highlight ? 'is-highlight' : undefined}
+            onClick={() => ticker.scrollToSection(i, 0)}
+            aria-label={name}
+            title={name}
+          >
+            {s.kind === 'part' ? <b aria-hidden="true">{s.chapter}</b> : <i />}
+          </button>
+        );
+      })}
     </nav>
   );
 }
@@ -136,5 +145,33 @@ export function StackTrail() {
       <span className="trail__depth" ref={depthRef} />
       <code className="trail__code" ref={codeRef} />
     </div>
+  );
+}
+
+/** Bottom-right: back to the top, once you've scrolled most of a screen. */
+export function BackToTop() {
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    let last: boolean | null = null;
+    return ticker.onFrame((f) => {
+      const show = f.y > f.vh * 0.8;
+      if (show !== last) {
+        ref.current?.toggleAttribute('data-show', show);
+        if (ref.current) ref.current.tabIndex = show ? 0 : -1;
+        last = show;
+      }
+    });
+  }, []);
+  return (
+    <button
+      ref={ref}
+      type="button"
+      className="totop"
+      aria-label={UI.backToTopLabel}
+      title={UI.backToTopLabel}
+      onClick={() => ticker.scrollToSection(0, 0)}
+    >
+      <span aria-hidden="true">↑</span> {UI.backToTop}
+    </button>
   );
 }

@@ -1,20 +1,27 @@
 /**
- * Halftone renderer: turns per-cell intensities into quantized squares.
+ * Halftone renderer: turns per-cell intensities into quantized marks.
  *
  * Each cell is drawn at one of five sizes (LEVELS). Values between two levels
  * are ordered-dithered with a 4×4 Bayer matrix, which produces the checker and
  * dot textures of print halftone. Level 4 fills the whole cell, so dense areas
  * merge into solid pixel blocks.
+ *
+ * Mid-tone cells take the chapter's MARK shape, so each chapter has its own
+ * texture: 0 = square (Model), 1 = dash (Memory, like lines of text),
+ * 2 = cross (Harness). Solid cells are always full squares.
  */
 
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 export const LEVELS = [0, 0.24, 0.42, 0.64, 1];
 const STEPS = LEVELS.length - 1;
 
+export const MARK = { square: 0, dash: 1, cross: 2 } as const;
+
 export type HalftoneInput = {
   ctx: CanvasRenderingContext2D;
   values: Float32Array; // final intensity 0..1
   accent: Uint8Array; // 1 = draw in accent color
+  marks: Uint8Array; // per-cell mark shape (MARK)
   w: number;
   h: number;
   cell: number; // device px
@@ -25,10 +32,12 @@ export type HalftoneInput = {
 };
 
 export function drawHalftone(o: HalftoneInput) {
-  const { ctx, values, accent, w, h, cell, offX, offY } = o;
+  const { ctx, values, accent, marks, w, h, cell, offX, offY } = o;
   const inkPath = new Path2D();
   const accPath = new Path2D();
   const sizes = LEVELS.map((l, i) => (i === STEPS ? cell : Math.max(1, Math.round(l * cell))));
+  // dash: wider than tall; cross: arms of the square's size, ~38% thick
+  const dashH = Math.max(1, Math.round(cell * 0.3));
   for (let y = 0; y < h; y++) {
     const row = y * w;
     const by = (y & 3) << 2;
@@ -41,22 +50,34 @@ export function drawHalftone(o: HalftoneInput) {
       if (f - lvl > BAYER[by | (x & 3)]) lvl++;
       if (lvl <= 0) continue;
       if (lvl > STEPS) lvl = STEPS;
-      const s = sizes[lvl];
+      const path = accent[row + x] ? accPath : inkPath;
       const px0 = offX + x * cell;
-      let px: number, py: number, sw: number;
       if (lvl === STEPS) {
         // full cell: snap both edges so neighbours tile without seams
-        px = Math.round(px0);
-        py = Math.round(py0);
-        sw = Math.round(px0 + cell) - px;
-        const sh = Math.round(py0 + cell) - py;
-        (accent[row + x] ? accPath : inkPath).rect(px, py, sw, sh);
+        const px = Math.round(px0);
+        const py = Math.round(py0);
+        path.rect(px, py, Math.round(px0 + cell) - px, Math.round(py0 + cell) - py);
         continue;
       }
-      const pad = (cell - s) / 2;
-      px = Math.round(px0 + pad);
-      py = Math.round(py0 + pad);
-      (accent[row + x] ? accPath : inkPath).rect(px, py, s, s);
+      const s = sizes[lvl];
+      const mark = marks[row + x];
+      if (mark === 1) {
+        // dash: a short horizontal stroke, length grows with intensity
+        const len = Math.min(cell, Math.round(s * 1.5));
+        path.rect(Math.round(px0 + (cell - len) / 2), Math.round(py0 + (cell - dashH) / 2), len, dashH);
+      } else if (mark === 2 && s >= 3) {
+        // cross: two bars through the centre
+        const t = Math.max(1, Math.round(s * 0.38));
+        const cx = Math.round(px0 + (cell - s) / 2);
+        const cy = Math.round(py0 + (cell - s) / 2);
+        const m = Math.round((s - t) / 2);
+        path.rect(cx, cy + m, s, t);
+        path.rect(cx + m, cy, t, m);
+        path.rect(cx + m, cy + m + t, t, s - m - t);
+      } else {
+        const pad = (cell - s) / 2;
+        path.rect(Math.round(px0 + pad), Math.round(py0 + pad), s, s);
+      }
     }
   }
   ctx.fillStyle = o.inkColor;

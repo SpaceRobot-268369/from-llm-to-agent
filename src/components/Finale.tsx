@@ -60,11 +60,11 @@ export function Credits() {
       <p>
         {c.lead} <b lang="zh-Hans">{c.author}</b> — <span lang="zh-Hans">《{c.title}》</span> ·{' '}
         <a href={c.youtube} target="_blank" rel="noreferrer">
-          YouTube
+          {c.youtubeLabel}
         </a>{' '}
         ·{' '}
         <a href={c.bilibili} target="_blank" rel="noreferrer">
-          Bilibili
+          {c.bilibiliLabel}
         </a>
       </p>
       <p>
