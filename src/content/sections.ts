@@ -342,7 +342,7 @@ export const SECTIONS: Section[] = [
     palette: { bg: '#5A564E', ink: INK_LIGHT, px: '#F0ECE3', accent: '#FF8A4C' },
     length: READ,
     wrap: 'tools',
-    lede: 'Like a brain with no hands, a model alone can only think in text. The harness is everything around it — tools, the loop, MCP, skills, sub-agents — each coming up next. It turns a chatbot into an agent.',
+    lede: 'Like a brain with no hands, a model alone can only think in text. The harness is everything around it — tools, the loop, MCP, skills, agent files, sub-agents — each coming up next. It turns a chatbot into an agent.',
     kicker: 'Tool calling',
     title: 'The model can’t run code. It can ask.',
     analogy: 'Like a manager who can’t touch the keyboard, so they write instructions for someone who can.',

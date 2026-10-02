@@ -33,8 +33,9 @@ alternatives.
      [`.claude/launch.json`](../../../.claude/launch.json) (or the provider's
      equivalent).
    - Otherwise: `npm run dev` from the repo root, in the background.
-4. **Confirm.** Wait until `http://localhost:5173` responds, then report the
-   URL.
+4. **Confirm.** Wait until the URL Vite prints responds
+   (`http://localhost:5173` unless that port was taken — Vite and the preview
+   then pick the next free one), then report the URL.
 
 ## Failure handling
 

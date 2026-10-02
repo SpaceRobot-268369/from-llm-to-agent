@@ -37,7 +37,8 @@ npm run dev        # http://localhost:5173
 - **Copy:** [`src/content/sections.ts`](src/content/sections.ts) (designed
   in [`content-outline.md`](.agents/context/products/content-outline.md)).
 - **Pixel engine:** [`src/engine/`](src/engine/) — ticker, Pixel Field,
-  halftone renderer, one scene per section in `scenes/`.
+  halftone renderer, one scene per topic in `scenes/` (the chapter cards
+  share an empty `part` scene).
 - **Layout & HUD:** [`src/components/`](src/components/) and
   [`src/styles/global.css`](src/styles/global.css).
 

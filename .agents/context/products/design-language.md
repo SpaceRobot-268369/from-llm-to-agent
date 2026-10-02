@@ -370,7 +370,7 @@ appears once you have scrolled ~80% of a viewport and jumps back to the hero.
 | Display & titles | Archivo (variable width) | titles `font-stretch: 84%`, weight ~680; hero 70% / 800, uppercase |
 | Body | Archivo | 15.5–17.5px, `text-wrap: pretty` |
 | Labels, code, HUD | JetBrains Mono | uppercase labels with 0.1–0.14em tracking |
-| Numerals & chapter labels | Silkscreen | the pixel font — parameter counter, step numbers, chapter numerals, stickers, wordmark |
+| Numerals & pixel labels | Silkscreen | the pixel font — numbers (parameter counter, step and watch numbers, chapter numerals, contents, rail and product numbers), hero stickers, chart fork labels, loader readout, Top button, wordmark |
 
 ## Pixel font
 

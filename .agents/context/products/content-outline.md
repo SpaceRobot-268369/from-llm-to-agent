@@ -356,7 +356,7 @@ to each scene's beats.
   request/result arrows.
 - **Lede:** Like a brain with no hands, a model alone can only think in text.
   The harness is everything around it — tools, the loop, MCP, skills,
-  sub-agents — each coming up next. It turns a chatbot into
+  agent files, sub-agents — each coming up next. It turns a chatbot into
   an agent. *(The blog's CPU-and-peripherals framing, simplified for a general
   audience.)*
 - **Analogy:** Like a manager who can't touch the keyboard, so they write
@@ -400,7 +400,8 @@ to each scene's beats.
 
 - **Scene `mcp`:** an AI app in the middle and real-world services scattered
   around it as pixel tiles with pixel-font labels — **Notion, Google Drive,
-  OneDrive, Slack** — **with no connecting lines**. Each tile has a
+  OneDrive, Slack** (tiles read NOTION, DRIVE, ONEDRIVE, SLACK) — **with no
+  connecting lines**. Each tile has a
   different-shaped port: they speak different languages. An **MCP
   specification card** appears and stamps every port into the same shape (the
   protocol is a shared spec, not a hub). Then messages — small accent
