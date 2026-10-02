@@ -7,7 +7,10 @@
  *   window.__sceneBench('rag', { p: 0.5 })   → avg ms per paint
  *
  * ASCII legend: " .:-=+*#%@" = ink intensity (0 → 1); "o" / "O" = accent
- * pixels (mid / strong). Rows are squashed 2:1 so shapes keep their aspect.
+ * pixels (mid / strong); "1"–"5" / "a"–"e" = ink cells tagged with a vivid
+ * colour (Raster.col → VIVID[0..4] in color.ts: blue, violet, magenta,
+ * crimson, orange), strong / mid. Rows are squashed 2:1 so shapes keep their
+ * aspect.
  */
 import { artRect, BASE_CELL_DESKTOP, BASE_CELL_MOBILE, grid, toGrid, type Side } from './layout';
 import { Raster } from './raster';
@@ -30,6 +33,9 @@ type Opts = {
 };
 
 const RAMP = ' .:-=+*#%@';
+/** vivid colour slot k (1-based) → strong / mid glyph */
+const VIVID_STRONG = '12345';
+const VIVID_MID = 'abcde';
 
 function paint(id: SceneId, o: Opts) {
   const mobile = !!o.mobile;
@@ -65,14 +71,19 @@ function ascii(id: SceneId, o: Opts = {}): string {
     for (let x = x0; x < x1; x++) {
       let ink = 0;
       let acc = 0;
+      let col = 0;
       for (let dy = 0; dy < (squash ? 2 : 1); dy++) {
         const yy = y + dy;
         if (yy >= r.h) continue;
         const i = yy * r.w + x;
-        ink = Math.max(ink, r.ink[i]);
+        if (r.ink[i] > ink) {
+          ink = r.ink[i];
+          col = r.col[i];
+        }
         acc = Math.max(acc, r.acc[i]);
       }
       if (acc > ink && acc > 0.08) s += acc > 0.6 ? 'O' : 'o';
+      else if (col && ink > 0.08) s += (ink > 0.6 ? VIVID_STRONG : VIVID_MID)[col - 1] ?? '?';
       else s += RAMP[Math.min(RAMP.length - 1, Math.round(ink * (RAMP.length - 1)))];
     }
     lines.push(s.replace(/\s+$/, ''));

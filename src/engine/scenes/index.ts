@@ -6,7 +6,6 @@ import thinking from './thinking';
 import chat from './chat';
 import system from './system';
 import window from './window';
-import memory from './memory';
 import rag from './rag';
 import tools from './tools';
 import agent from './agent';
@@ -26,7 +25,6 @@ export const SCENES: Record<SceneId, Scene> = {
   chat,
   system,
   window,
-  memory,
   rag,
   tools,
   agent,

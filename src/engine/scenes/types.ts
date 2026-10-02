@@ -22,7 +22,8 @@ export type SceneState = {
   /**
    * Scene progress 0 → 1: the section's sticky progress remapped by
    * sceneProgress() to the act where the story plays (raw section progress on
-   * mobile, or the steps-list position for mobile WATCH sections). Nothing is drawn while the headline card is up;
+   * mobile, or the steps-list position for mobile WATCH sections and the
+   * demo's position for 1.1 — ticker mobileScene). Nothing is drawn while the headline card is up;
    * p = 0 is the frame the diagram fades in on (and, for watch sections, the
    * frame held through the read act), so it must be a complete composition.
    */
@@ -54,7 +55,6 @@ export type SceneId =
   | 'chat'
   | 'system'
   | 'window'
-  | 'memory'
   | 'rag'
   | 'tools'
   | 'agent'

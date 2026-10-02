@@ -1,18 +1,44 @@
 /**
- * system — a personality is a paragraph. A tall document holds the chat so
- * far, turn by turn, ending in a blinking cursor. Above the chat sits a
- * frosted band you never see. Scrolling types that hidden band into view in
- * accent, line by line; then the dashed rule that set it apart dissolves — it
- * was the same text all along.
+ * system — the prompt before your prompt. One frame is everything the model
+ * reads. Inside it, top to bottom, the same order as the 2.2 code block: four
+ * hidden file cards (COMPANY · APP · SETTINGS · MEMORY), a pleated curtain
+ * with a HIDDEN plaque, and below it the only part you see — YOU and your own
+ * message bubble. A dotted arrow carries the whole frame to the model (a ring
+ * around a solid core, labelled LLM).
  *
- * This file also holds the documents-family kit shared with memory and rag:
- * whole-cell bars, dog-eared pages, rows of word blocks, the prompt strip and
- * its cursor. Every weight is a whole number of cells so edges stay crisp.
+ * p (scene progress) tells the story:
+ *   0            the frame, four empty dotted slots above the curtain, your
+ *                message below it, the model waiting: a complete picture of
+ *                what you think you sent.
+ *   0.05 – 0.48  the cards slide in from the left, one by one, and settle
+ *                into their slots (solid accent chips, labels knocked out,
+ *                a clipped corner so they read as files).
+ *   0.52 – 0.66  the model reads it all: a beam sweeps the frame top to
+ *                bottom — straight through the curtain — and the frame turns
+ *                accent behind it.
+ *   0.60 – 0.74  accent fills the arrow from the frame to the model …
+ *   0.72 – 0.78  … and the core lights up: it has read every part.
+ *   0.78 – 1     hold; the arrow's dots keep flowing (t).
+ * Accent marks the hidden parts and their flow; your side stays ink.
+ * Everything reads at t = 0. On phones the art band is clear only before the
+ * copy scrolls over it, so there the same story loops in time (loopP) and
+ * reduced motion holds the finished picture.
+ *
+ * Layout: whole cells, the largest kit that fits the box (cached per box).
+ * Desktop side boxes put the model (ringed, labelled) to the right of the
+ * frame; a narrow box puts it on top; phones swap the chips for a list (file
+ * icon + label) and the model for a bare solid core; wide, short boxes lay
+ * the cards in two columns; 375-wide phones drop the frame, and the shortest
+ * the plaque too.
+ *
+ * This file also holds the documents-family kit shared with rag: whole-cell
+ * bars, dog-eared pages, rows of word blocks, the prompt strip and its
+ * cursor. Every weight is a whole number of cells so edges stay crisp.
  */
-import { clamp, easeOut, hash2, range } from '../noise';
+import { clamp, easeOut, hash2, lerp, range } from '../noise';
 import type { Raster } from '../raster';
 import type { Box, Scene } from './types';
-import { ACC, INK, blink, space } from './helpers';
+import { ACC, INK, blink, pixelText, pixelTextWidth, space } from './helpers';
 
 /* ---- documents-family kit ------------------------------------------------ */
 
@@ -214,136 +240,519 @@ export function cursor(g: CanvasRenderingContext2D, x: number, y: number, h: num
   cells(g, x, tall ? y - 1 : y, Math.max(2, h), tall ? h + 2 : 2, INK(blink(t)));
 }
 
-/** A dashed horizontal rule one cell high. */
-export function dashes(g: CanvasRenderingContext2D, x: number, y: number, w: number, dash: number, style: string) {
-  const x0 = Math.round(x);
-  const x1 = Math.round(x + w);
-  for (let cx = x0; cx < x1; cx += dash * 2) cells(g, cx, y, Math.min(dash, x1 - cx), 1, style);
-}
-
 /* ---- the scene ----------------------------------------------------------- */
 
-/** hidden instruction lines */
-const BAND = 5;
-/** chat turns: [is user, lines] */
-const TURNS: [boolean, number][] = [
-  [true, 1],
-  [false, 3],
-  [true, 1],
-  [false, 2],
-];
-const LINES = TURNS.reduce((n, [, l]) => n + l, 0);
+type G = CanvasRenderingContext2D;
+
+/** The hidden parts, in the order the app puts them together (the 2.2 code block). */
+const FILES = ['COMPANY', 'APP', 'SETTINGS', 'MEMORY'] as const;
+const WIDEST = 'SETTINGS';
+const CURTAIN = 'HIDDEN';
+const YOU = 'YOU';
+const MODEL = 'LLM';
+/** Pixel-font glyph height (font pixels). */
+const FH = 5;
+/** Your message: token widths, × token height. */
+const MSG = [1.8, 1, 2.3];
+/** Opaque black, drawn source-over: clears both channels (a knock-out). */
+const HOLE = '#000';
+
+// ── beats (scene progress) ──────────────────────────────────────────────
+/** Card k slides in over [CARD0 + k·STEP, + LEN]. */
+const CARD0 = 0.05;
+const CARD_STEP = 0.1;
+const CARD_LEN = 0.13;
+/** The model reads: a beam sweeps the frame top → bottom. */
+const SCAN: [number, number] = [0.52, 0.66];
+/** Accent fills the arrow, root → tip. */
+const FLOW: [number, number] = [0.6, 0.74];
+/** The core lights up (a wipe from the arrow's side). */
+const LIT: [number, number] = [0.72, 0.78];
 
 /**
- * Vertical rhythm for a kit and a looseness step e (−1 = packed and −2 =
- * tightest, for short boxes): band pitch, chat pitch, the extra gap between
- * turns, the space around the rule, and the document height that results.
+ * Phones: the art band is only in clear view before the copy scrolls over it
+ * (and while the section dissolves in), so there the story plays on a loop in
+ * time — wait, play, hold the finished picture, rewind. t = 0 (reduced
+ * motion) holds the finished picture.
  */
-function rhythm(row: number, T: number, e: number) {
-  const pad = T + row;
-  const up = Math.max(0, e) >> 1;
-  const bp = row + 1 + up;
-  const cp = row + Math.max(1, 2 + e);
-  const tg = e >= 0 ? row : e === -1 ? Math.max(1, row - 1) : 0;
-  const gapR = e >= -1 ? row + 1 + up : row;
-  const band = BAND * bp - (bp - row);
-  const chat = (LINES - 1) * cp + (TURNS.length - 1) * tg + row;
-  return { pad, bp, cp, tg, gapR, h: pad * 2 + band + gapR * 2 + 1 + chat };
+const LOOP = 10;
+function loopP(t: number): number {
+  if (t === 0) return 1;
+  const s = t % LOOP;
+  if (s < 0.6) return 0;
+  if (s < 6.4) return ((s - 0.6) / 5.8) * LIT[1];
+  if (s < 9.3) return 1;
+  return LIT[1] * (1 - easeOut((s - 9.3) / 0.7));
+}
+
+// ── kits ────────────────────────────────────────────────────────────────
+
+type Kit = {
+  /** the model above the frame (else to its right) */
+  top: boolean;
+  /** font scale (cells per font pixel) */
+  fs: number;
+  /** solid chips with knocked-out labels; false = a list (file icon + label) */
+  chip: boolean;
+  /** chip padding around the label, and its clipped corner */
+  cpx: number;
+  cpy: number;
+  ear: number;
+  /** gap between card rows; columns of cards and their gap */
+  cg: number;
+  cols: 1 | 2;
+  cgx: number;
+  /** frame outline weight (0 = no frame) and inner padding */
+  lw: number;
+  fpad: number;
+  /** curtain: the HIDDEN plaque, else a thin band `hc` rows high */
+  plaque: boolean;
+  hc: number;
+  /** gap between the zones: cards · curtain · your view */
+  zg: number;
+  /** your bubble: token height and padding; the YOU label */
+  th: number;
+  bpx: number;
+  bpy: number;
+  you: boolean;
+  /** the model: core size, its gap to the ring, ring weight; the LLM label */
+  core: number;
+  rg: number;
+  rw: number;
+  label: boolean;
+  /** shortest gap between the frame and the model (the arrow lives in it) */
+  arrow: number;
+  /** empty cells kept inside the box */
+  m: number;
+};
+
+const ROOMY: Kit = {
+  top: false,
+  fs: 1,
+  chip: true,
+  cpx: 2, cpy: 1, ear: 3,
+  cg: 2, cols: 1, cgx: 3,
+  lw: 1, fpad: 1,
+  plaque: true, hc: 3,
+  zg: 2,
+  th: 3, bpx: 2, bpy: 2, you: true,
+  core: 5, rg: 2, rw: 1, label: true,
+  arrow: 6,
+  m: 1,
+};
+/** 2560-class boxes: everything at font scale 2. */
+const BIG: Kit = {
+  ...ROOMY,
+  fs: 2,
+  cpx: 4, cpy: 2, ear: 4,
+  cg: 2, cgx: 6,
+  lw: 2, fpad: 2,
+  zg: 2,
+  th: 5, bpx: 4, bpy: 3,
+  core: 10, rg: 3, rw: 2,
+  arrow: 10,
+  m: 1,
+};
+/** 1728–1920-class boxes: roomier chips and a heavier ring. */
+const LARGE: Kit = { ...ROOMY, cpx: 3, cpy: 2, cg: 3, fpad: 2, zg: 3, th: 4, bpx: 3, core: 7, rg: 2, rw: 2, arrow: 8, m: 2 };
+/** Shorter desktop boxes (1280 × 720). */
+const MID: Kit = { ...ROOMY, cg: 1, zg: 1, arrow: 5 };
+/** Wide, short boxes (tablets): the cards in two columns. */
+const WIDE: Kit = { ...ROOMY, cols: 2, cg: 1, zg: 1, arrow: 5 };
+/** Phones: a list — file icon + label — and the model as a bare solid core. */
+const LIST: Kit = {
+  ...ROOMY,
+  chip: false,
+  cg: 1, zg: 1,
+  th: 2, bpx: 2, bpy: 1,
+  core: 5, rg: 0, rw: 0, label: false,
+  arrow: 5,
+  m: 0,
+};
+/** Narrow, tall boxes (1024-wide desktops): the list with the model (ringed, labelled) on top. */
+const NARROW: Kit = { ...LIST, top: true, cg: 2, zg: 2, core: 3, rg: 1, rw: 1, label: true, m: 1 };
+/** Landscape phones: the list in two columns. */
+const WIDELIST: Kit = { ...LIST, cols: 2, cgx: 4 };
+/** 375-wide phones: no frame. */
+const BARE: Kit = { ...LIST, lw: 0, fpad: 0 };
+/** The shortest phones: no frame, a thin curtain without its plaque. */
+const TINY: Kit = { ...BARE, plaque: false, hc: 3 };
+const KITS = [BIG, LARGE, ROOMY, MID, WIDE, NARROW, LIST, WIDELIST, BARE, TINY];
+
+type Lay = {
+  k: Kit;
+  /** frame (outer edge) and its inside */
+  fx: number;
+  fy: number;
+  fw: number;
+  fh: number;
+  ix: number;
+  iy: number;
+  iw: number;
+  /** one card's size, every slot's top-left, and the x the cards slide in from */
+  cardW: number;
+  cardH: number;
+  slots: [number, number][];
+  enter: number;
+  /** curtain: top, height, pleats' span, the rod's span */
+  curY: number;
+  curH: number;
+  cx0: number;
+  cx1: number;
+  rod0: number;
+  rod1: number;
+  /** your bubble, its tokens, the YOU label */
+  bx: number;
+  by: number;
+  bw: number;
+  bh: number;
+  tail: number;
+  toks: number[];
+  tgap: number;
+  youY: number;
+  /** the model's ring (top-left, size) and label */
+  rx: number;
+  ry: number;
+  R: number;
+  labX: number;
+  labY: number;
+  /** the arrow: stem root (top-left of its first cell), length, thickness, head */
+  ax: number;
+  ay: number;
+  alen: number;
+  st: number;
+  head: number;
+};
+
+/** Place kit `k` in `box`, or null when it does not fit. */
+function fit(box: Box, k: Kit, force = false): Lay | null {
+  const fs = k.fs;
+  const bx0 = Math.ceil(box.x);
+  const by0 = Math.ceil(box.y);
+  const availW = Math.floor(box.x + box.w) - bx0 - 2 * k.m;
+  const availH = Math.floor(box.y + box.h) - by0 - 2 * k.m;
+
+  // the cards
+  const LW = pixelTextWidth(WIDEST, fs);
+  let cardW = k.chip ? LW + 2 * k.cpx + Math.max(0, k.ear - k.cpy + 1 - k.cpx) : 5 * fs + LW;
+  const cardH = k.chip ? FH * fs + 2 * k.cpy : FH * fs;
+  const rowsN = FILES.length / k.cols;
+  const cardsW = k.cols * cardW + (k.cols - 1) * k.cgx;
+  const cardsH = rowsN * cardH + (rowsN - 1) * k.cg;
+  // the curtain
+  const plaqueW = pixelTextWidth(CURTAIN, fs) + 4 * fs;
+  const curH = k.plaque ? (FH + 2) * fs : k.hc;
+  // your view
+  const toks = MSG.map((w) => Math.round(w * k.th));
+  const tgap = Math.max(1, Math.round(k.th * 0.5));
+  const bw = toks.reduce((a, b) => a + b, 0) + tgap * (toks.length - 1) + 2 * k.bpx;
+  const bh = k.th + 2 * k.bpy;
+  const tail = Math.max(1, Math.round(k.th * 0.6));
+  const youW = k.you ? pixelTextWidth(YOU, fs) + 3 * fs : 0;
+  const zoneH = Math.max(bh + tail, k.you ? FH * fs : 0);
+  // the frame
+  const iw = Math.max(cardsW, k.plaque ? plaqueW + 8 * fs : 0, youW + bw);
+  const ih = cardsH + k.zg + curH + k.zg + zoneH;
+  // chips stretch to fill the frame, so the stack reads as one block
+  if (k.chip) cardW = Math.floor((iw - (k.cols - 1) * k.cgx) / k.cols);
+  const edge = k.lw + k.fpad;
+  const fw = iw + 2 * edge;
+  const fh = ih + 2 * edge;
+  // the model
+  const st = fs;
+  const R = k.core + 2 * (k.rg + k.rw);
+  const labW = k.label ? pixelTextWidth(MODEL, fs) : 0;
+
+  let W: number;
+  let H: number;
+  if (k.top) {
+    W = Math.max(fw, R + 2 * (2 * fs + labW));
+    H = R + k.arrow + fh;
+  } else {
+    W = fw + k.arrow + Math.max(R, labW);
+    H = Math.max(fh, R + (k.label ? 2 * fs + FH * fs : 0));
+  }
+  if (!force && (W > availW || H > availH)) return null;
+
+  // spare room lengthens the arrow (up to twice its shortest)
+  const A = k.top ? k.arrow + clamp(availH - H, 0, k.arrow) : k.arrow + clamp(availW - W, 0, k.arrow);
+  const totW = k.top ? W : W - k.arrow + A;
+  const totH = k.top ? H - k.arrow + A : H;
+  const ox = bx0 + k.m + Math.floor((availW - totW) / 2);
+  const oy = by0 + k.m + Math.floor((availH - totH) / 2);
+
+  let fx: number;
+  let fy: number;
+  let rx: number;
+  let ry: number;
+  let ax: number;
+  let ay: number;
+  let alen: number;
+  let labX: number;
+  let labY: number;
+  if (k.top) {
+    fx = ox + Math.floor((totW - fw) / 2);
+    fy = oy + R + A;
+    ax = fx + Math.floor((fw - st) / 2);
+    ay = fy - 2;
+    rx = ax - Math.floor((R - st) / 2);
+    ry = oy;
+    alen = ay - (ry + R);
+    labX = rx + R + 2 * fs;
+    labY = ry + Math.floor((R - FH * fs) / 2);
+  } else {
+    fx = ox;
+    fy = oy + Math.floor((totH - fh) / 2);
+    const colW = Math.max(R, labW);
+    rx = fx + fw + A + Math.floor((colW - R) / 2);
+    ry = fy + Math.floor((fh - R) / 2);
+    ax = fx + fw + 1;
+    ay = ry + Math.floor((R - st) / 2);
+    alen = rx - 1 - ax;
+    labX = rx + Math.floor((R - labW) / 2);
+    labY = ry + R + 2 * fs;
+  }
+
+  // a short arrow is all head
+  const head = Math.max(1, Math.min(st === 1 ? 3 : 4, alen));
+  const ix = fx + edge;
+  const iy = fy + edge;
+  const cardsX = ix + Math.floor((iw - (k.cols * cardW + (k.cols - 1) * k.cgx)) / 2);
+  const slots: [number, number][] = FILES.map((_, i) => [
+    cardsX + (i % k.cols) * (cardW + k.cgx),
+    iy + Math.floor(i / k.cols) * (cardH + k.cg),
+  ]);
+  const curY = iy + cardsH + k.zg;
+  const zy = curY + curH + k.zg;
+  // the curtain hangs across the whole frame; its rod overhangs by one font pixel
+  const cx0 = k.lw ? fx + k.lw : ix;
+  const cx1 = k.lw ? fx + fw - k.lw : ix + iw;
+  const rod0 = (k.lw ? fx : ix) - fs;
+  const rod1 = (k.lw ? fx + fw : ix + iw) + fs;
+  const by = zy + Math.floor((zoneH - tail - bh) / 2);
+
+  return {
+    k,
+    fx, fy, fw, fh, ix, iy, iw,
+    cardW, cardH, slots,
+    enter: Math.floor(box.x) - cardW - 2,
+    curY, curH, cx0, cx1, rod0, rod1,
+    bx: ix + iw - bw, by, bw, bh, tail, toks, tgap,
+    // centred on the bubble, but never up into the gap under the curtain (a label taller than a phone's bubble)
+    youY: Math.max(zy, by + Math.floor((bh - FH * fs) / 2)),
+    rx, ry, R, labX, labY,
+    ax, ay, alen, st, head,
+  };
+}
+
+/** The largest kit that fits — and, given spare height, a looser rhythm. Cached per box. */
+let cacheKey = '';
+let cacheLay: Lay | null = null;
+function layout(box: Box): Lay {
+  const key = `${box.x}|${box.y}|${box.w}|${box.h}`;
+  if (key === cacheKey && cacheLay) return cacheLay;
+  let lay: Lay | null = null;
+  for (const k of KITS) {
+    lay = fit(box, k);
+    if (!lay) continue;
+    for (let e = 1; e <= 2; e++) {
+      const loose = fit(box, { ...k, cg: k.cg + e, zg: k.zg + e });
+      if (!loose) break;
+      lay = loose;
+    }
+    break;
+  }
+  lay ??= fit(box, TINY, true)!;
+  cacheKey = key;
+  cacheLay = lay;
+  return lay;
+}
+
+// ── drawing ─────────────────────────────────────────────────────────────
+
+/** Draw `fn`'s shapes as holes: whatever it paints is cleared from both channels. */
+function knock(g: G, fn: () => void) {
+  g.globalCompositeOperation = 'source-over';
+  fn();
+  g.globalCompositeOperation = 'lighter';
+}
+
+/** A solid card with its top-right corner clipped in whole-cell steps. */
+function clipped(g: G, x: number, y: number, w: number, h: number, ear: number, style: string) {
+  cells(g, x, y + ear, w, h - ear, style);
+  for (let r = 0; r < ear; r++) cells(g, x, y + r, w - (ear - r), 1, style);
+}
+
+/** An empty slot: a dotted outline. */
+function slot(g: G, x: number, y: number, w: number, h: number, style: string) {
+  for (let i = 0; i < w; i += 2) {
+    cells(g, x + i, y, 1, 1, style);
+    cells(g, x + i, y + h - 1, 1, 1, style);
+  }
+  for (let j = 2; j < h - 1; j += 2) {
+    cells(g, x, y + j, 1, 1, style);
+    cells(g, x + w - 1, y + j, 1, 1, style);
+  }
+}
+
+/** One hidden file: a chip with its label knocked out, or (list) a file icon + label. */
+function card(g: G, L: Lay, i: number, x: number, y: number) {
+  const { k, cardW, cardH } = L;
+  const fs = k.fs;
+  // a card covers whatever it slides over
+  knock(g, () => cells(g, x, y, cardW, cardH, HOLE));
+  if (k.chip) {
+    clipped(g, x, y, cardW, cardH, k.ear, ACC(1));
+    knock(g, () => pixelText(g, FILES[i], x + k.cpx, y + k.cpy, HOLE, { scale: fs }));
+  } else {
+    clipped(g, x, y, 3 * fs, FH * fs, fs, ACC(1));
+    pixelText(g, FILES[i], x + 5 * fs, y, ACC(1), { scale: fs });
+  }
+}
+
+/** The curtain: a rod, pleats with a scalloped hem, and (if room) the HIDDEN plaque. */
+function curtain(g: G, L: Lay) {
+  const { k, curY, curH, cx0, cx1, rod0, rod1 } = L;
+  const fs = k.fs;
+  const style = INK(1);
+  cells(g, rod0, curY, rod1 - rod0, fs, style);
+  const pw = 2 * fs;
+  const pitch = 3 * fs;
+  const pleat = (x: number, j: number) => cells(g, x, curY + fs, pw, curH - fs - (j % 2 ? fs : 0), style);
+  if (!k.plaque) {
+    for (let x = cx0, j = 0; x + pw <= cx1; x += pitch, j++) pleat(x, j);
+    return;
+  }
+  const w = pixelTextWidth(CURTAIN, fs) + 4 * fs;
+  const px = Math.round((cx0 + cx1 - w) / 2);
+  cells(g, px, curY, w, curH, style);
+  knock(g, () => pixelText(g, CURTAIN, px + 2 * fs, curY + fs, HOLE, { scale: fs }));
+  // pleats from each end inwards, a font pixel clear of the plaque
+  for (let x = cx0, j = 0; x + pw <= px - fs; x += pitch, j++) pleat(x, j);
+  for (let x = cx1 - pw, j = 0; x >= px + w + fs; x -= pitch, j++) pleat(x, j);
+}
+
+/** Your side: YOU, and your message in a chat bubble with its tail at the right. */
+function yourView(g: G, L: Lay) {
+  const { k, bx, by, bw, bh, tail, toks, tgap } = L;
+  const ol = INK(1);
+  const t = Math.max(1, k.lw);
+  cells(g, bx + t, by + t, bw - 2 * t, bh - 2 * t, INK(0.18));
+  // outline with its corner cells left out, so it reads rounded
+  cells(g, bx + t, by, bw - 2 * t, t, ol);
+  cells(g, bx + t, by + bh - t, bw - 2 * t, t, ol);
+  cells(g, bx, by + t, t, bh - 2 * t, ol);
+  cells(g, bx + bw - t, by + t, t, bh - 2 * t, ol);
+  const xr = bx + bw - t - 1;
+  for (let r = 0; r < tail; r++) cells(g, xr - (tail - r), by + bh + r, tail - r, 1, ol);
+  let x = bx + k.bpx;
+  for (const w of toks) {
+    cells(g, x, by + k.bpy, w, k.th, INK(0.9));
+    x += w + tgap;
+  }
+  if (k.you) pixelText(g, YOU, L.ix, L.youY, INK(1), { scale: k.fs });
+}
+
+/**
+ * The arrow from the frame to the model: a dotted stem `st` cells thick and a
+ * solid head, axis-aligned (rightwards, or upwards when the model is on top).
+ * The first `lit` (0..1) of it is accent; `phase` walks the dots forward.
+ */
+function arrow(g: G, L: Lay, lit: number, phase: number) {
+  const { ax, ay, alen, st, head } = L;
+  const up = L.k.top;
+  const block = (d: number, c: number, dl: number, cw: number, style: string) =>
+    up ? cells(g, ax + c, ay - d - dl + 1, cw, dl, style) : cells(g, ax + d, ay + c, dl, cw, style);
+  const hd = alen - head;
+  const litTo = alen * lit;
+  for (let d = (phase & 1) * st; d + st <= hd - 1; d += 2 * st) block(d, 0, st, st, d < litTo ? ACC(1) : INK(0.7));
+  const hs = litTo >= Math.max(hd, alen * 0.5) ? ACC(1) : INK(1);
+  for (let i = 0; i < head; i++) {
+    const sp = head - 1 - i;
+    block(hd + i, -sp, 1, st + 2 * sp, hs);
+  }
+}
+
+/** The model: a ring around a solid core; `lit` wipes the core to accent from the arrow's side. */
+function model(g: G, L: Lay, lit: number) {
+  const { k, rx, ry, R } = L;
+  outline(g, rx, ry, R, R, k.rw, INK(1));
+  const c = k.core;
+  const cx = rx + k.rw + k.rg;
+  const cy = ry + k.rw + k.rg;
+  const n = Math.round(c * lit);
+  if (k.top) {
+    // the arrow arrives from below: light the core bottom-up
+    cells(g, cx, cy, c, c - n, INK(1));
+    cells(g, cx, cy + c - n, c, n, ACC(1));
+  } else {
+    cells(g, cx, cy, n, c, ACC(1));
+    cells(g, cx + n, cy, c - n, c, INK(1));
+  }
+  if (k.label) pixelText(g, MODEL, L.labX, L.labY, INK(1), { scale: k.fs });
 }
 
 const scene: Scene = {
-  paint({ r, box, p, t, mobile }) {
+  paint({ r, box, p: scroll, t, mobile }) {
     const g = r.begin();
-    // 2-cell rows when they fit, else 1-cell rows; then loosen the line pitch
-    // until the document fills the box's height
-    const fill = fillHeight(box);
-    let kit = docKit(box);
-    if (kit.row > 1 && rhythm(kit.row, kit.T, -1).h > fill) kit = docKit(box, true);
-    const { X, Y, L, T, row, unit } = kit;
-    let lay = rhythm(row, T, -2);
-    for (let e = -1; e < row && rhythm(row, T, e).h <= fill; e++) lay = rhythm(row, T, e);
-    const { pad, bp, cp, tg, gapR, h: docH } = lay;
-    const docW = Math.round(L(mobile ? 0.74 : 0.58) * 2);
-    const x0 = Math.round(X(0) - docW / 2);
-    const y0 = Math.round(Y(0) - docH / 2);
-    const x1 = x0 + docW;
-    const y1 = y0 + docH;
-    const ear = row * 2 + T + 1;
-    const ix = x0 + pad + 1;
-    const iw = docW - (pad + 1) * 2;
-    const bandY = y0 + pad;
-    const ruleY = bandY + BAND * bp - (bp - row) + gapR;
-    const chatY = ruleY + 1 + gapR;
+    const p = mobile ? loopP(t) : scroll;
+    const L = layout(box);
+    const { k, fx, fy, fw, fh, cardW, cardH } = L;
 
-    // story: the band unveils (tint), then its lines type in, then the rule dissolves
-    const unveil = easeOut(range(0.05, 0.3, p));
-    const typed = range(0.1, 0.55, p) * BAND;
-    const merge = range(0.55, 0.72, p);
-
-    // band backdrop: frosted ink while hidden → accent tint once seen
-    g.save();
-    pagePath(g, x0, y0, x1, y1, ear, T + 1);
-    g.clip();
-    const by0 = y0 + T + 1;
-    const bh = ruleY - 1 - by0;
-    if (unveil < 1) cells(g, x0, by0, docW, bh, INK(0.1 * (1 - unveil)));
-    if (unveil > 0) cells(g, x0, by0, docW, bh, ACC(0.2 * unveil));
-    g.restore();
-
-    // band lines: ghosts until typed
-    let pen = -1;
-    let penY = 0;
-    for (let i = 0; i < BAND; i++) {
-      const y = bandY + i * bp;
-      const len = i === BAND - 1 ? 0.55 : ragged(i, 41, 0.78);
-      const tag = i === 0 ? unit * 2 + 1 : 0;
-      const lp = clamp(typed - i);
-      if (lp < 1) {
-        if (tag) cells(g, ix, y, tag - 1, row, INK(0.3));
-        words(g, ix + tag, y, iw - tag, row, unit, 40 + i, len, 1, INK(0.26));
+    // the frame: everything the model reads; accent above the reading beam
+    const scan = easeOut(range(SCAN[0], SCAN[1], p));
+    const ys = Math.round(fy + fh * scan);
+    if (k.lw) {
+      if (scan > 0) {
+        g.save();
+        g.beginPath();
+        g.rect(fx - 1, fy - 1, fw + 2, ys - fy + 1);
+        g.clip();
+        outline(g, fx, fy, fw, fh, k.lw, ACC(1));
+        g.restore();
       }
-      if (lp > 0) {
-        if (tag) cells(g, ix, y, (tag - 1) * Math.min(1, lp * 6), row, ACC(1));
-        const end = words(g, ix + tag, y, iw - tag, row, unit, 40 + i, len, lp, ACC(1));
-        if (lp < 1) {
-          pen = end;
-          penY = y;
-        }
+      if (scan < 1) {
+        g.save();
+        g.beginPath();
+        g.rect(fx - 1, ys, fw + 2, fy + fh + 1 - ys);
+        g.clip();
+        outline(g, fx, fy, fw, fh, k.lw, INK(1));
+        g.restore();
       }
     }
-    if (pen >= 0) cells(g, pen + 1, penY, Math.max(2, row), row, ACC(blink(t)));
 
-    // the rule between what you never see and what you do
-    if (merge < 1) dashes(g, ix, ruleY, iw, unit, INK(0.75 * (1 - merge)));
-
-    // the chat: user turns indented, each turn opens with a solid tag
-    let y = chatY;
-    let lastEnd = ix;
-    let lastY = chatY;
-    let j = 0;
-    for (const [user, lines] of TURNS) {
-      const lx = user ? ix + Math.round(iw * 0.3) : ix;
-      const lw = ix + iw - lx;
-      for (let k = 0; k < lines; k++) {
-        const last = k === lines - 1;
-        const len = last ? 0.35 + 0.3 * hash2(j, 7, 5) : ragged(j, 9, 0.8);
-        let tx = lx;
-        if (k === 0) {
-          const tw = user ? unit + 1 : unit * 2;
-          cells(g, lx, y, tw, row, INK(0.9));
-          tx = lx + tw + 1;
-        }
-        lastEnd = words(g, tx, y, lx + lw - tx, row, unit, 70 + j, len, 1, INK(0.55));
-        lastY = y;
-        y += cp;
-        j++;
-      }
-      y += tg;
+    // the hidden files slide in, one by one; empty slots wait as dotted outlines
+    const cs = FILES.map((_, i) => easeOut(range(CARD0 + i * CARD_STEP, CARD0 + i * CARD_STEP + CARD_LEN, p)));
+    for (let i = 0; i < FILES.length; i++) {
+      if (cs[i] < 1) slot(g, L.slots[i][0], L.slots[i][1], cardW, cardH, INK(0.45));
     }
-    cursor(g, lastEnd + 1, lastY, row, t);
+    // cards still in flight first, so a landed card stays on top of them
+    for (const pass of [0, 1]) {
+      for (let i = 0; i < FILES.length; i++) {
+        const s = cs[i];
+        if (s <= 0 || (s >= 1) !== (pass === 1)) continue;
+        const [sx, sy] = L.slots[i];
+        card(g, L, i, Math.round(lerp(L.enter, sx, s)), sy);
+      }
+    }
 
-    // the document itself
-    page(g, x0, y0, docW, docH, T, ear, INK(0.95));
+    curtain(g, L);
+    yourView(g, L);
+
+    // the model reads the whole frame, then lights up
+    const flow = range(FLOW[0], FLOW[1], p);
+    arrow(g, L, flow, flow > 0 ? Math.floor(t * 3) : 0);
+    model(g, L, range(LIT[0], LIT[1], p));
+
+    // the reading beam: one row, straight through the curtain
+    if (scan > 0 && scan < 1) {
+      const x0 = k.lw ? fx : L.ix;
+      const w = k.lw ? fw : L.iw;
+      const y = Math.min(ys, fy + fh - k.fs);
+      knock(g, () => cells(g, x0, y, w, k.fs, HOLE));
+      cells(g, x0, y, w, k.fs, ACC(1));
+    }
+
     r.commit();
   },
 };

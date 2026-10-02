@@ -13,10 +13,13 @@
  *                stack for each worker (sends at 0.15 / 0.24 / 0.33, each a
  *                0.08 flight); the cards arc down and stick to the workers'
  *                monitors as sticky notes.
- *   0.23 – 0.82  each worker works from the moment its card lands: it turns
- *                to its screen, the screen types line after line, and a
- *                small loop ring with a runner turns above its head (its own
- *                agent loop). Its desk stays clean (a fresh context).
+ *   0.23 – 0.82  each worker works from the moment its card lands: a chat
+ *                bubble pops up over its screen (accent, then ink: a fresh
+ *                chat session, as in 2.1), it turns to its screen, the screen
+ *                types line after line, and a small loop ring with a runner
+ *                turns above its head (its own agent loop). Its desk stays
+ *                clean (a fresh context). The bubble needs room above the
+ *                screen, so short boxes (mobile) leave it out.
  *   0.70 – 0.90  each worker sends back ONE portrait summary page (accent;
  *                leaves at 0.70 / 0.76 / 0.82) that is tossed up and dropped
  *                on the right of the manager's desk, where the small pile
@@ -76,6 +79,19 @@ const TICK4: [number, number][] = [
   [2, 1],
   [1, 2],
 ];
+
+/**
+ * A chat bubble with "…" across its middle and a tail pointing down at the
+ * worker (7 × 6): it pops up over a worker's screen when its task card lands —
+ * each sub-agent is a fresh chat session (as in 2.1).
+ */
+const CHAT: string[] = ['.#####.', '#######', '#.#.#.#', '#######', '.#####.', '.##....'];
+/** A flatter one (7 × 4) where there are fewer rows above the screen. */
+const CHAT_M: string[] = ['.#####.', '#.#.#.#', '.#####.', '.##....'];
+/** A smaller one (5 × 4) for tighter boxes. */
+const CHAT_S: string[] = ['#####', '#.#.#', '#####', '.#...'];
+/** How long a new chat bubble stays accent before it settles to ink. */
+const CHAT_NEW = 0.08;
 
 // ── pixel primitives (integer cells, so everything stays crisp) ─────────────
 
@@ -570,6 +586,25 @@ const scene: Scene = {
 
       // its own loop: a small ring with a runner above its head
       if (on > 0 && D.R) loop(g, ring[i][0], ring[i][1], D.R, Math.PI * 1.5 + i * 2.1 + t * 2.2 + p * 40, on);
+
+      // a new chat session: a chat bubble pops up over its screen as the card
+      // lands (accent), then stays. Only where there is room above the screen,
+      // right of its own loop and clear of the next worker's.
+      if (p >= land) {
+        const side = D.R || D.wHead >> 1;
+        const xLo = Math.max(mX, px + side + 2);
+        const xHi = i < 2 ? px + D.pitch - side - 1 : Math.floor(box.x + box.w);
+        const glyph = [CHAT, CHAT_M, CHAT_S].find((c) => xHi - xLo >= c[0].length && mY - D.stickUp - 1 - c.length >= labelY + FONT_H + 2);
+        if (glyph) {
+          const gw = glyph[0].length;
+          const cy0 = mY - D.stickUp - 1 - glyph.length;
+          const cx0 = Math.min(xHi - gw, Math.max(xLo, mX + ((D.monW - gw) >> 1)));
+          const style = p < land + CHAT_NEW ? ACC(1) : INK(1);
+          for (let yy = 0; yy < glyph.length; yy++) {
+            for (let xx = 0; xx < gw; xx++) if (glyph[yy][xx] === '#') rect(g, cx0 + xx, cy0 + yy, 1, 1, style);
+          }
+        }
+      }
     }
 
     // ── labels

@@ -2,6 +2,10 @@
  * A grid-resolution buffer: one value per Pixel Field cell, in two channels.
  *   ink — ordinary pixels (drawn in the section's pixel color)
  *   acc — highlighted pixels (drawn in the section's accent color)
+ * plus an optional colour tag:
+ *   col — 0 = none; k = draw this cell's INK in the fixed vivid colour
+ *         VIVID[k - 1] (color.ts) instead of the pixel colour. Cleared every
+ *         frame like the channels; scenes that never write it are unaffected.
  *
  * Scenes may write into `ink` / `acc` directly, or draw vector shapes with the
  * 2D context from `begin()` and then `commit()` them. Vector drawing happens at
@@ -13,6 +17,7 @@ export class Raster {
   h = 0;
   ink = new Float32Array(0);
   acc = new Float32Array(0);
+  col = new Uint8Array(0);
   private canvas: HTMLCanvasElement;
   private g: CanvasRenderingContext2D;
 
@@ -29,11 +34,13 @@ export class Raster {
     this.canvas.height = h;
     this.ink = new Float32Array(w * h);
     this.acc = new Float32Array(w * h);
+    this.col = new Uint8Array(w * h);
   }
 
   clear() {
     this.ink.fill(0);
     this.acc.fill(0);
+    this.col.fill(0);
   }
 
   /** Start a vector pass. Use `INK(a)` / `ACC(a)` as fill or stroke styles. */

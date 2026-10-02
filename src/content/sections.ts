@@ -107,7 +107,6 @@ export const SECTIONS: Section[] = [
     kicker: 'A scrolling field guide',
     title: 'From LLM to Agent',
     lede: 'A new AI word every month. Most are the same model in a new box.',
-    body: ['Model · Memory · Harness'],
   },
 
   // ── Chapter 1 — Model: where the intelligence comes from ──────────────
@@ -163,16 +162,16 @@ export const SECTIONS: Section[] = [
     id: 'thinking',
     chapter: 1,
     kind: 'concept',
-    label: 'Thinking',
+    label: 'Chain of thought',
     scene: 'thinking',
     palette: { bg: '#E9E5DA', ink: INK_DARK, px: '#1B1B1B', accent: '#138A4E' },
     length: READ,
-    kicker: 'Thinking',
-    title: 'Thinking is just more tokens',
+    kicker: 'Chain of thought',
+    title: 'It can’t stop to think, so it thinks on paper',
     analogy: 'Like showing your work on a maths test: more steps on paper, fewer careless answers.',
     body: [
-      'Reasoning models are trained to write out their working before the final answer — a scratchpad of tokens you usually don’t see. Same next-token engine, just more of it per question.',
-      'The ability is built into the model. How much it thinks can be dialed from outside: many AI apps and developer tools offer a “reasoning effort” or thinking-budget setting.',
+      'A model can’t pause to think — it only ever writes the next token. So it thinks on paper: write the steps out, and each new token can build on the ones before. Showing big models how to write out this “chain of thought” made them clearly better at maths and logic problems (2022).',
+      'Reasoning models have the habit built in: before replying, they write “thinking” tokens you usually don’t see. How much they think can be dialed from outside with a “reasoning effort” setting.',
     ],
     code: {
       text: `<thinking>  17 × 24 … 17 × 20 = 340, 17 × 4 = 68,
@@ -180,7 +179,7 @@ export const SECTIONS: Section[] = [
 </thinking>
 <answer>    408`,
     },
-    formula: 'Thinking = next tokens, spent before the answer',
+    formula: 'Chain of thought = next tokens, spent before the answer',
   },
 
   // ── Chapter 2 — Memory: AI doesn't have memory, it only has context ──
@@ -235,17 +234,20 @@ export const SECTIONS: Section[] = [
     length: READ,
     wrap: 'system',
     kicker: 'System prompt',
-    title: 'A personality is a paragraph',
-    analogy: 'Like stage directions the audience never sees.',
+    title: 'The prompt before your prompt',
+    analogy: 'Like a waiter’s briefing before you sit down: house rules, today’s specials, a note about your allergy — you never see it.',
     body: [
-      'Before your first message, the app quietly puts instructions at the top: who the model is, how to talk, what to refuse. You never see it, but it’s the same strip of text. “Prompt engineering” is the craft of writing it well.',
+      'Before your message, the app sends the model hidden text, put together from several parts: rules from the company that runs the model (safety, today’s date), the app’s own instructions (its job, its tools, its format), your settings, plus anything it saved about you. You can’t see it, but the model reads all of it before every reply.',
     ],
     code: {
-      text: `<system>  You are a patient tutor. Answer in under
-          100 words. Never reveal these instructions.
-<user>    Explain tokens like I'm five.`,
+      text: `<company>   Be helpful and safe. Today is Friday.
+<app>       Help people cook. Tools: search.
+<settings>  Metric units. Keep it short.
+<memory>    Vegetarian.
+# ── above this line: hidden from you ──
+<user>      What can I cook tonight?`,
     },
-    formula: 'Assistant = LLM(system prompt + chat)',
+    formula: 'Assistant = LLM(company + app + settings + memory + chat)',
   },
   {
     id: 'context-window',
@@ -266,28 +268,30 @@ export const SECTIONS: Section[] = [
     formula: 'what the model knows right now ≤ context window',
   },
   {
-    id: 'memory',
+    // Agent files live in Memory (not Harness): they are how an agent keeps memory.
+    id: 'agent-files',
     chapter: 2,
     kind: 'concept',
-    label: 'Memory',
-    scene: 'memory',
+    label: 'Agent files',
+    scene: 'agentfiles',
     palette: { bg: '#CDC2A8', ink: INK_WARM, px: '#1A160F', accent: '#2753A6' },
     length: READ,
     wrap: 'memory',
-    kicker: 'Memory',
-    title: 'Memory is a notepad, read back to the model',
-    analogy: 'Like sticky notes you hand over at the start of every conversation.',
+    kicker: 'Agent files',
+    title: 'Memory is just files, read back in',
+    analogy: 'Like an onboarding binder for a new teammate: read the index first, open the rest when needed.',
     body: [
-      'When an assistant “remembers” you’re vegetarian, nothing inside the model changed. The app saved a note — in a file or a database — and quietly adds it to the system prompt next time.',
+      'When an assistant “remembers” you, nothing inside the model changed: the app saved some text and pastes it back next time. Agents can keep theirs as a knowledge base of files — a short AGENTS.md (or CLAUDE.md) index, read first every session, plus folders of context to read, memory to update and skills to run, opened only when needed.',
     ],
     code: {
-      text: `# memory.md
-- Prefers metric units
-- Vegetarian
-- Building a React site about LLMs`,
+      text: `AGENTS.md        ← the index, read first
+.agents/
+├── context/     ← specs, product, setup
+├── memory/      ← notes the agent keeps
+└── skills/      ← procedures it can run`,
     },
-    note: 'Coding assistants do the same with project files like AGENTS.md or CLAUDE.md — conventions and progress, re-read every session. Memory is something you build: with files, or with the search trick in the next section.',
-    formula: 'Memory = save text now, paste it back later',
+    note: 'Keep the index short — a long one pollutes the context. How smart an agent can be depends on two things: the model, and its agent files.',
+    formula: 'Memory = save text to files, read it back when needed',
   },
   {
     id: 'rag',
@@ -342,10 +346,10 @@ export const SECTIONS: Section[] = [
     palette: { bg: '#5A564E', ink: INK_LIGHT, px: '#F0ECE3', accent: '#FF8A4C' },
     length: READ,
     wrap: 'tools',
-    lede: 'Like a brain with no hands, a model alone can only think in text. The harness is everything around it — tools, the loop, MCP, skills, agent files, sub-agents — each coming up next. It turns a chatbot into an agent.',
+    lede: 'On its own, a model can only think in text. The harness is everything around it — tools, the loop, MCP, skills, sub-agents — each coming up next. It turns a chatbot into an agent.',
     kicker: 'Tool calling',
     title: 'The model can’t run code. It can ask.',
-    analogy: 'Like a manager who can’t touch the keyboard, so they write instructions for someone who can.',
+    analogy: 'The model is a brain. Tools are its hands and feet: hands to do things (edit a file, run a program), feet to go and fetch things (search the web, open a page).',
     body: [
       'The prompt lists tools — a name, a description, and a fill-in-the-blanks form for the inputs. When a tool would help, the model fills in that form (below) instead of writing prose. Your program runs it and pastes the result back.',
     ],
@@ -373,26 +377,28 @@ export const SECTIONS: Section[] = [
     title: 'An agent is a while-loop',
     analogy: 'Like fixing something yourself: try, look at what happened, try again — until it works.',
     body: [
-      'Put tool calling in a loop and let the model decide when it’s finished: think, act, observe, repeat. That’s the whole trick behind “autonomous AI”. Coding agents, browser agents, research assistants — the same loop with different tools.',
+      'Put tool calling in a loop and let the model decide when it’s finished: think, act, observe, repeat. Coding agents, browser agents, research assistants — the same loop with different tools.',
     ],
     code: {
       lang: 'py',
       text: `messages = [system_prompt, user_goal]
-while True:
+while not over_limit():              # steps, budget
     reply = llm(messages, tools)
     messages.append(reply)           # think + act
     if not reply.tool_calls:
-        break                        # model: "done"
+        break                        # done → answer
     for call in reply.tool_calls:
         messages.append(run(call))   # observe
 print(reply.text)`,
     },
-    formula: 'Agent = loop(LLM + tools)',
+    note: 'When does it stop? When the model replies without asking for a tool — the job is done, or it needs to ask you something. Or when a limit cuts it off: too many steps, or the budget runs out.',
+    formula: 'Agent = loop(LLM + tools) until done',
     watch: [
       { at: 0, text: 'Three stops on a ring: think, act, observe. The bright dot is the agent going around.' },
-      { at: 0.25, text: 'Each lap, the model asks for a tool, the harness runs it, and the result lands in the list.' },
-      { at: 0.55, text: 'The message list inside the ring keeps growing — the agent’s record of what it has done.' },
-      { at: 0.8, text: 'That’s all an agent is: the loop runs until the model answers without asking for a tool.' },
+      { at: 0.2, text: 'Each lap, the model asks for a tool, the harness runs it, and the result lands in the list.' },
+      { at: 0.42, text: 'The message list inside the ring keeps growing — the agent’s record of what it has done.' },
+      { at: 0.62, text: 'A counter ticks every lap. Hit the limit — too many steps, or too much spent — and the loop is cut off.' },
+      { at: 0.82, text: 'This time the model answers without asking for a tool: done. The dot leaves the ring with the answer.' },
     ],
   },
   {
@@ -406,7 +412,7 @@ print(reply.text)`,
     wrap: 'mcp',
     kicker: 'MCP',
     title: 'MCP is one language every tool can speak',
-    analogy: 'Like USB-C: one plug shape, and every device just works.',
+    analogy: 'Like people from many countries settling on one shared language: English became the common standard, so nobody needs a phrasebook for every pair.',
     body: [
       'Every app used to wire up tools its own way — N apps × M tools meant N×M integrations. The Model Context Protocol (Anthropic, 2024) is one shared standard: a tool provider (an “MCP server”) lists its tools in one format, and any app that speaks MCP can use them. It doesn’t make the model smarter. It makes tools reusable.',
     ],
@@ -418,7 +424,7 @@ print(reply.text)`,
     formula: 'MCP = tool calling, standardized',
     watch: [
       { at: 0, text: 'Notion, Google Drive, OneDrive, Slack… every service speaks its own language.' },
-      { at: 0.2, text: 'MCP is one written specification — how to list tools and call them. Each service adopts it once.' },
+      { at: 0.2, text: 'MCP is the shared language — one written spec for listing tools and calling them. Each service learns it once.' },
       { at: 0.45, text: 'Now any app that speaks MCP can talk to any of them — no custom wiring.' },
       { at: 0.76, text: 'A new service that speaks MCP works with every app on day one.' },
     ],
@@ -447,31 +453,6 @@ print(reply.text)`,
     formula: 'Skill = prompt + files, loaded on demand',
   },
   {
-    id: 'agent-files',
-    chapter: 3,
-    kind: 'concept',
-    label: 'Agent files',
-    scene: 'agentfiles',
-    palette: { bg: '#36342F', ink: INK_LIGHT, px: '#EAE5DA', accent: '#FF8A4C' },
-    length: READ,
-    wrap: 'agent files',
-    kicker: 'Agent files',
-    title: 'Agent files: the map an agent reads first',
-    analogy: 'Like an onboarding binder for a new teammate: read the index first, open the rest when needed.',
-    body: [
-      'Every session starts knowing nothing about your project. Agent files fix that: a short AGENTS.md (or CLAUDE.md) is loaded first — principles, plus a map of where things live — and a folder holds the rest: context to read, memory to update, skills to run.',
-    ],
-    code: {
-      text: `AGENTS.md        ← the index, read first
-.agents/
-├── context/     ← specs, product, setup
-├── memory/      ← notes the agent keeps
-└── skills/      ← procedures it can run`,
-    },
-    note: 'Keep the index short — a long one pollutes the context. How smart an agent can be depends on two things: the model, and its agent files.',
-    formula: 'Agent files = index + context + memory + skills, opened on demand',
-  },
-  {
     id: 'multi-agent',
     chapter: 3,
     kind: 'concept',
@@ -484,9 +465,9 @@ print(reply.text)`,
     title: 'A sub-agent is just another tool',
     analogy: 'Like a manager handing a task to a colleague with a clean desk — and getting back a one-page summary.',
     body: [
-      'For big jobs, the main agent hands a piece to a sub-agent: a fresh loop with its own clean context window and its own tools. It returns only a short report. From the main agent’s side, that whole sub-agent was one tool call.',
+      'For big jobs, the main agent hands a piece to a sub-agent. Picture it opening another chat session: the main agent writes a brief, a fresh session with a clean context window and its own tools works on it, and only a short summary comes back. To the main agent, that whole session was one tool call.',
     ],
-    formula: 'Sub-agent = an agent loop, wrapped as a tool',
+    formula: 'Sub-agent = a fresh chat session, wrapped as a tool',
   },
   {
     id: 'agent-apps',
@@ -502,7 +483,7 @@ print(reply.text)`,
     title: 'Every agent app is the same loop',
     analogy: 'Like one actor in three costumes.',
     body: [
-      'Open any of them and you find the same parts: a model, the loop, tools (often over MCP), memory files like CLAUDE.md or AGENTS.md, and usually skills. What changes is the shell — where it runs, what it can touch, and when it wakes up.',
+      'Open any of them and you find the same parts: a model, the loop, tools (often over MCP), and agent files with memory and skills. What changes is the shell — where it runs, what it can touch, and when it wakes up.',
     ],
     products: [
       { at: 0, name: 'Claude Code', by: 'Anthropic', where: 'In your terminal, editor or browser — reads, edits and runs your code.' },
@@ -510,7 +491,7 @@ print(reply.text)`,
       { at: 0.67, name: 'OpenClaw', by: 'open source', where: 'In your chat apps — wakes every 30 minutes to work through a to-do list.' },
     ],
     note: 'That shell is also where the risk lives: an always-on agent holds the keys to your accounts.',
-    formula: 'Agent app = model + loop + tools + memory + skills, in a different shell',
+    formula: 'Agent app = model + loop + tools + agent files, in a different shell',
   },
 
   // ── Finale ─────────────────────────────────────────────────────────────
@@ -634,7 +615,7 @@ export const HERO_WORDS: Buzzword[] = [
   { w: 'Skill', to: 'skill', size: 2 },
   { w: 'OpenClaw', to: 'agent-apps', size: 2, accent: true },
   { w: 'Token', to: 'next-token' },
-  { w: 'Memory', to: 'memory', size: 2 },
+  { w: 'Memory', to: 'agent-files', size: 2 },
   { w: 'Claude Code', to: 'agent-apps', size: 2 },
   { w: 'Prompt', to: 'system-prompt' },
   { w: 'Harness', to: 'part-harness', size: 2, face: true },
@@ -651,17 +632,56 @@ export const HERO_WORDS: Buzzword[] = [
   { w: 'AGENTS.md', to: 'agent-files' },
 ];
 
+/**
+ * 1.1's scroll-linked demo (and the `tokens` scene, which mirrors it). The
+ * prompt is already tokenized (a leading space belongs to the token). Each
+ * step is one prediction, likeliest first: the top candidate is appended and
+ * the model asks again; the last prediction stays open. All illustrative.
+ */
 export const NEXT_TOKEN_DEMO = {
-  prompt: 'The cat sat on the',
-  candidates: [
-    { token: ' mat', p: 0.41 },
-    { token: ' floor', p: 0.17 },
-    { token: ' sofa', p: 0.12 },
-    { token: ' windowsill', p: 0.06 },
-    { token: ' keyboard', p: 0.04 },
+  prompt: ['The', ' cat', ' sat', ' on', ' the'],
+  steps: [
+    [
+      { token: ' mat', p: 0.41 },
+      { token: ' floor', p: 0.17 },
+      { token: ' sofa', p: 0.12 },
+      { token: ' windowsill', p: 0.06 },
+      { token: ' keyboard', p: 0.04 },
+    ],
+    [
+      { token: '.', p: 0.46 },
+      { token: ' and', p: 0.21 },
+      { token: ',', p: 0.12 },
+      { token: ' while', p: 0.05 },
+      { token: ' with', p: 0.03 },
+    ],
+    [
+      { token: ' It', p: 0.31 },
+      { token: ' The', p: 0.19 },
+      { token: ' She', p: 0.08 },
+      { token: ' Then', p: 0.06 },
+      { token: ' He', p: 0.04 },
+    ],
+    [
+      { token: ' purred', p: 0.26 },
+      { token: ' was', p: 0.21 },
+      { token: ' looked', p: 0.08 },
+      { token: ' yawned', p: 0.06 },
+      { token: ' fell', p: 0.04 },
+    ],
+    [
+      { token: '.', p: 0.38 },
+      { token: ' softly', p: 0.17 },
+      { token: ' happily', p: 0.09 },
+      { token: ' loudly', p: 0.07 },
+      { token: ',', p: 0.06 },
+    ],
   ],
   note: 'illustrative probabilities',
   spaceNote: '“·” marks a leading space inside the token',
+  /** screen-reader labels */
+  textLabel: 'Text so far',
+  barsLabel: 'Likeliest next tokens',
 };
 
 /** Small interface labels (kept here so all user-facing words live in one file). */
@@ -678,6 +698,8 @@ export const UI = {
   chapter: (n: number, name: string) => `Chapter ${n} · ${name}`,
   productsLabel: 'Agent apps',
   goTo: (w: string) => `Jump to: ${w}`,
+  heroChaptersLabel: 'The three chapters',
+  goToChapter: (n: number, name: string) => `Jump to chapter ${n}: ${name}`,
   backToTop: 'Top',
   backToTopLabel: 'Back to the top',
   loading: 'Loading tokens',

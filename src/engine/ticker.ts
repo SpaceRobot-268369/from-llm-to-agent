@@ -11,6 +11,7 @@ import Lenis from 'lenis';
 import { SECTIONS } from '../content/sections';
 import { contrast, css, hex, mix, type RGB } from './color';
 import { writePhaseVars } from './phases';
+import { wipeFront } from './wipe';
 
 export type FrameColors = { bg: RGB; ink: RGB; px: RGB; accent: RGB };
 
@@ -39,9 +40,10 @@ export type Frame = {
   /** per-section progress, same indexing as SECTIONS */
   progress: number[];
   /**
-   * Mobile only: scene progress for WATCH sections, driven by where the
-   * steps list is on screen (so the animation plays while the steps are read).
-   * null for sections without a steps list.
+   * Mobile only: scene progress driven by where an anchor is on screen — the
+   * WATCH steps list (so the animation plays while the steps are read), or
+   * the next-token demo (so its steps play while it is fully in view).
+   * null for sections without either.
    */
   mobileScene: (number | null)[];
 };
@@ -55,6 +57,10 @@ type Rec = {
   watch: HTMLElement | null;
   wTop: number;
   wBottom: number;
+  /** the next-token demo, if the section has one (doc coordinates) */
+  demo: HTMLElement | null;
+  dTop: number;
+  dBottom: number;
 };
 
 const PALETTES = SECTIONS.map((s) => ({
@@ -79,6 +85,12 @@ class Ticker {
   private t0 = 0;
   private dirtyMeasure = true;
   private lastRoot = '';
+  private lastSplit = '';
+  /** layout viewport width without the scrollbar (= the canvas width), for --split-x / --split-r */
+  private icbW = 0;
+  /** the section currently carrying --leave, and the value written */
+  private leaveIdx = -1;
+  private lastLeave = '';
   private lenis: Lenis | null = null;
   private mobileMq: MediaQueryList | null = null;
   private reducedMq: MediaQueryList | null = null;
@@ -105,7 +117,18 @@ class Ticker {
 
   register(index: number, el: HTMLElement | null) {
     if (el) {
-      this.recs[index] = { el, top: 0, height: 0, lastP: -1, watch: el.querySelector<HTMLElement>('.watch'), wTop: 0, wBottom: 0 };
+      this.recs[index] = {
+        el,
+        top: 0,
+        height: 0,
+        lastP: -1,
+        watch: el.querySelector<HTMLElement>('.watch'),
+        wTop: 0,
+        wBottom: 0,
+        demo: el.querySelector<HTMLElement>('.tokdemo'),
+        dTop: 0,
+        dBottom: 0,
+      };
     } else {
       this.recs[index] = undefined;
     }
@@ -199,6 +222,7 @@ class Ticker {
 
   private measure() {
     const y = window.scrollY;
+    this.icbW = document.documentElement.clientWidth;
     for (const rec of this.recs) {
       if (!rec) continue;
       const r = rec.el.getBoundingClientRect();
@@ -208,6 +232,11 @@ class Ticker {
         const w = rec.watch.getBoundingClientRect();
         rec.wTop = w.top + y;
         rec.wBottom = w.bottom + y;
+      }
+      if (rec.demo) {
+        const d = rec.demo.getBoundingClientRect();
+        rec.dTop = d.top + y;
+        rec.dBottom = d.bottom + y;
       }
     }
     this.dirtyMeasure = false;
@@ -257,6 +286,14 @@ class Ticker {
         const b = Math.min(rec.wTop - vh * 0.45, docH - vh);
         const m = b > a ? (y - a) / (b - a) : 0;
         f.mobileScene[i] = m < 0 ? 0 : m > 1 ? 1 : m;
+      } else if (f.mobile && rec.demo) {
+        // the next-token demo sits at the foot of the copy panel: its steps
+        // (and the scene's, which mirror them) play while it is fully on
+        // screen — from its bottom edge arriving to its top reaching the bar
+        const a = rec.dBottom - vh;
+        const b = Math.max(a + vh * 0.3, rec.dTop - vh * 0.1);
+        const m = (y - a) / (b - a);
+        f.mobileScene[i] = m < 0 ? 0 : m > 1 ? 1 : m;
       } else {
         f.mobileScene[i] = null;
       }
@@ -299,6 +336,39 @@ class Ticker {
       rs.setProperty('--accent', css(f.colors.accent));
       rs.setProperty('--px', css(f.colors.px));
       this.lastRoot = rootKey;
+    }
+    // fixed chrome (top bar, Top button, stack trail) splits its background
+    // where the canvas does during a chapter wipe: new colour left of the
+    // front, old right. --split is a % of the viewport width (full-width
+    // chrome); --split-x / --split-r are the same front in px from the left /
+    // right edge, so smaller chrome can place it inside its own box
+    // (background-attachment: fixed is ignored on iOS and on transformed boxes)
+    const left = chapterChange ? css(B.bg) : css(bg);
+    const right = chapterChange ? css(A.bg) : css(bg);
+    const front = chapterChange ? wipeFront(k) : 1;
+    const fx = front * this.icbW;
+    const split = `${(front * 100).toFixed(2)}%`;
+    const splitKey = `${left}|${right}|${split}|${this.icbW}`;
+    if (splitKey !== this.lastSplit) {
+      const rs = document.documentElement.style;
+      rs.setProperty('--bg-l', left);
+      rs.setProperty('--bg-r', right);
+      rs.setProperty('--split', split);
+      rs.setProperty('--split-x', `${fx.toFixed(1)}px`);
+      rs.setProperty('--split-r', `${(this.icbW - fx).toFixed(1)}px`);
+      this.lastSplit = splitKey;
+    }
+    // --leave: 0 → 1 as the next section slides over the current one (CSS
+    // fades content that would otherwise scroll up under the top bar)
+    const leave = k.toFixed(3);
+    if (cur !== this.leaveIdx) {
+      this.recs[this.leaveIdx]?.el.style.removeProperty('--leave');
+      this.leaveIdx = cur;
+      this.lastLeave = '';
+    }
+    if (leave !== this.lastLeave) {
+      this.recs[cur]?.el.style.setProperty('--leave', leave);
+      this.lastLeave = leave;
     }
     // mobile browser chrome follows the page: switch at the blend midpoint
     const theme = css(k < 0.5 ? A.bg : B.bg);

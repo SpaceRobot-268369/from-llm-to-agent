@@ -203,6 +203,16 @@ colour and accent cells in its `accent` colour. Scenes never name a colour.
 token, the retrieved pages, the agent's runner, the matched skill, the hidden
 system band.
 
+**The one exception: vivid colour.** Where colour itself is the meaning —
+the scaling brain lighting up fold by fold as the model grows (more colour =
+more intelligence) — a scene tags ink cells with a slot of the fixed `VIVID`
+palette ([`color.ts`](../../../src/engine/color.ts)) through `Raster.col`.
+The hues are saturated mid-darks that stay legible on the scaling green and
+never read as ink; the brain's rim stays ink. The tag is cleared every frame
+and travels through the dissolve like the accent does, so scenes that never
+write it are unaffected. `__scene` shows tagged cells as `1`–`5` (strong) /
+`a`–`e` (mid).
+
 ## Scene
 
 **What it means.** A pure painter, one per section (the chapter cards share
@@ -220,7 +230,8 @@ type Scene = {
 - `p` is the **scene progress**: the section's sticky progress remapped by
   `sceneProgress()` to the act where the story plays (`PHASES[mode].scene`);
   raw section progress on mobile, or the steps-list position for mobile
-  watch sections. **p = 0 must be a complete composition**: on desktop it is
+  watch sections (and the next-token demo's position for 1.1, so its steps
+  play while the whole demo is on screen). **p = 0 must be a complete composition**: on desktop it is
   the frame shown as the diagram fades in with the read act (nothing, not
   even a ghost, shows behind a headline card) and, for watch sections, the
   one held through the whole read act. On mobile, where the art band stays
@@ -383,7 +394,7 @@ Capitals, digits and a few symbols.
 
 ## Product switcher
 
-**What it means.** In *Agent apps* (3.7), the text column shows one product
+**What it means.** In *Agent apps* (3.6), the text column shows one product
 at a time (Claude Code → Codex → OpenClaw). It changes in step with the
 diagram, whose shell dissolves into the next while the core loop stays put.
 Data: `products: [{ at, name, by, where }]`, timed on scene progress like

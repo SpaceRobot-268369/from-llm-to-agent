@@ -5,6 +5,8 @@
  * problem. A short conversation builds up in "SESSION 1"; then a NEW SESSION
  * starts, the old bubbles vanish, "what did I ask?" is sent — and the model
  * can only answer "?". Then it repeats. (Reduced motion: that "?" moment.)
+ * The label, its rule and every bubble outline keep CLEAR empty cells between
+ * them; a box too short for four bubbles scrolls the chat like a phone does.
  *
  * WATCH act (p > 0): the fix. Four chat bubbles alternate left and right (the
  * last one still typing). Scrolling slides them into one left-aligned column,
@@ -41,6 +43,12 @@ const END_B = 5.5;
 const ASK = [5.6, 6.3];
 const REPLY = 6.7;
 
+/** empty cells kept between the session label, its rule and every bubble outline */
+const CLEAR = 2;
+
+/** Cells a stroke of weight `lw` spills past the edge it outlines (it straddles that edge). */
+const spillOf = (lw: number) => Math.ceil(lw / 2 - edge(lw));
+
 function bubble(
   g: CanvasRenderingContext2D,
   x: number,
@@ -69,17 +77,19 @@ function bubble(
   g.fill();
 }
 
-/** Tokens typed into a bubble: `typed` 0..1 of `n` tokens; returns the end x. */
+/** Tokens typed into a bubble: `typed` 0..1 of `n` tokens; returns the x after the last drawn piece. */
 function typeTokens(g: CanvasRenderingContext2D, x: number, y: number, widths: number[], typed: number, th: number, gap: number) {
   const shown = typed * widths.length;
   let cx = x;
+  let end = x;
   for (let i = 0; i < widths.length; i++) {
     if (i >= shown) break;
-    const part = Math.min(1, shown - i);
-    token(g, cx, y, Math.max(1, Math.round(widths[i] * part)), th, INK(0.88));
+    const w = Math.max(1, Math.round(widths[i] * Math.min(1, shown - i)));
+    token(g, cx, y, w, th, INK(0.88));
+    end = cx + w + gap;
     cx += widths[i] + gap;
   }
-  return cx;
+  return end;
 }
 
 function forgetfulLoop(g: CanvasRenderingContext2D, box: Parameters<Scene['paint']>[0]['box'], t: number, mobile: boolean) {
@@ -90,38 +100,67 @@ function forgetfulLoop(g: CanvasRenderingContext2D, box: Parameters<Scene['paint
   const padX = Math.max(2, Math.round(th * 0.7));
   const padY = Math.max(2, Math.round(th * 0.45));
   const bh = th + padY * 2;
-  const bgap = Math.round(th * 0.95);
   const tail = Math.max(2, Math.round(th * 0.9));
-  const maxW = Math.round(Math.min(box.w * 0.86, L(1.9)));
+  // a bubble's outline straddles its edge; stacked outlines keep CLEAR empty rows
+  const spill = spillOf(lw);
+  const bgap = Math.max(Math.round(th * 0.95), CLEAR + spill * 2);
+  const step = bh + bgap;
+  const colW = Math.round(Math.min(box.w * 0.86, L(1.9)));
+  const scale = box.s >= 56 && pixelTextWidth('NEW SESSION', 2) <= colW ? 2 : 1;
+  const labelW = pixelTextWidth('NEW SESSION', scale);
+  // the column is never narrower than its label, so the label stays inside the box
+  const maxW = Math.max(colW, Math.min(labelW, Math.floor(box.w) - 2));
   const x0 = Math.round(box.cx - maxW / 2);
-  const scale = box.s >= 56 && pixelTextWidth('NEW SESSION', 2) <= maxW ? 2 : 1;
+  // the label block: text, CLEAR rows, the rule (one font pixel thick) — then
+  // CLEAR or more empty rows before the first bubble's outline
   const labelH = 5 * scale;
-  const labelGap = Math.round(th * 1.1);
-  const stackH = turns.length * bh + (turns.length - 1) * bgap + tail;
-  const top = Math.round(box.cy - (labelH + labelGap + stackH) / 2);
-  const rowsY = top + labelH + labelGap;
+  const ruleY = labelH + CLEAR;
+  const headH = ruleY + scale;
+  const headGap = Math.max(CLEAR, Math.round(th * 0.8)) + spill;
+  const below = Math.max(tail, spill);
+  const room = Math.floor(box.h) - headH - headGap;
+  const stackH = (n: number) => n * bh + (n - 1) * bgap + below;
+  // session 2: the question ends in a token-high "?", the reply is one big "?"
+  // (single size if the box is too short); both bubbles grow to hold their glyph
+  const qs = Math.max(1, Math.floor(th / 5));
+  const askBH = Math.max(bh, 5 * qs + padY * 2);
+  const replyHOf = (s: number) => Math.max(bh, 5 * s + padY * 2);
+  const rs = askBH + bgap + replyHOf(scale * 2) + below <= room ? scale * 2 : scale;
+  const replyH = replyHOf(rs);
+  const askH = askBH + bgap + replyH + below;
+  // how many session-1 bubbles fit at once; a short box scrolls the chat like a phone
+  let fit = turns.length;
+  while (fit > 2 && stackH(fit) > room) fit--;
+  const top = Math.round(box.cy - (headH + headGap + Math.max(stackH(fit), askH)) / 2);
+  const rowsY = top + headH + headGap;
   const widthsOf = (j: number, n: number) => Array.from({ length: n }, (_, i) => tokenW(j * 10 + i, 41, th));
   const bubbleW = (ws: number[]) => ws.reduce((a, b) => a + b, 0) + gap * (ws.length - 1) + padX * 2;
 
   // the session label: SESSION 1 … then NEW SESSION (accent: the moment memory is lost)
   const fresh = local >= END_A;
   pixelText(g, fresh ? 'NEW SESSION' : 'SESSION 1', x0, top, fresh ? ACC(1) : INK(0.85), { scale });
-  if (fresh) {
-    // a rule under the label marks the clean slate
-    const lwid = pixelTextWidth('NEW SESSION', scale);
-    fillRound(g, x0, top + labelH + 2, lwid, 1, 0, ACC(0.9));
-  }
+  // a rule under the label marks the clean slate
+  if (fresh) fillRound(g, x0, top + ruleY, labelW, scale, 0, ACC(0.9));
 
   // session 1: four bubbles typed in turn, then dissolving away row by row
   const gone = range(END_A, END_B, local);
   if (gone < 1) {
-    let y = rowsY;
+    // when the chat outgrows the box, the oldest bubble clears away and the
+    // column moves up one row just before each new bubble arrives
+    const at = (j: number) => j * TYPE_STEP + 0.1;
+    let moved = 0;
+    for (let j = fit; j < turns.length; j++) moved += easeInOut(range(at(j) - 0.3, at(j), local));
+    const lift = Math.round(moved * step);
+    const hidden = turns.length - fit;
     for (let j = 0; j < turns.length; j++) {
-      const typed = range(j * TYPE_STEP + 0.1, j * TYPE_STEP + 0.9, local);
+      const typed = range(at(j), at(j) + 0.8, local);
       if (typed <= 0) break;
-      const a = 1 - range(j * 0.12, j * 0.12 + 0.55, gone);
+      const out = j + fit < turns.length ? range(at(j + fit) - 0.55, at(j + fit) - 0.3, local) : 0;
+      const k = Math.max(0, j - hidden);
+      const a = (1 - out) * (1 - range(k * 0.12, k * 0.12 + 0.55, gone));
       if (a > 0.01) {
         const user = j % 2 === 0;
+        const y = rowsY + j * step - lift;
         const ws = widthsOf(j, turns[j]);
         const bw = bubbleW(ws);
         const bx = user ? x0 + maxW - bw : x0;
@@ -129,30 +168,29 @@ function forgetfulLoop(g: CanvasRenderingContext2D, box: Parameters<Scene['paint
         const outer = g.globalAlpha;
         g.globalAlpha = outer * a;
         const end = typeTokens(g, bx + padX, y + padY, ws, typed, th, gap);
-        if (typed < 1) caret(g, end, y + padY, th, cw, 1);
+        // the caret rides the typing edge but never crosses the bubble's outline
+        if (typed < 1) caret(g, Math.min(end, bx + bw - padX - cw), y + padY, th, cw, 1);
         g.globalAlpha = outer;
       }
-      y += bh + bgap;
     }
   }
 
   // session 2: "what did I ask?" — and the model has nothing to go on
   if (local >= ASK[0]) {
     const ws = widthsOf(7, mobile ? 2 : 3);
-    const qW = pixelTextWidth('?', scale);
+    const qW = pixelTextWidth('?', qs);
     const typed = range(ASK[0], ASK[1], local);
     const bw = bubbleW(ws) + gap + qW;
     const bx = x0 + maxW - bw;
-    bubble(g, bx, rowsY, bw, bh, true, th, lw, 1);
-    const end = typeTokens(g, bx + padX, rowsY + padY, ws, Math.min(1, typed * 1.25), th, gap);
-    if (typed >= 0.85) pixelText(g, '?', end, rowsY + Math.round((bh - 5 * scale) / 2), INK(0.95), { scale });
-    const ry = rowsY + bh + bgap;
+    bubble(g, bx, rowsY, bw, askBH, true, th, lw, 1);
+    const end = typeTokens(g, bx + padX, rowsY + Math.round((askBH - th) / 2), ws, Math.min(1, typed * 1.25), th, gap);
+    if (typed >= 0.85) pixelText(g, '?', end, rowsY + Math.round((askBH - 5 * qs) / 2), INK(0.95), { scale: qs });
+    const ry = rowsY + askBH + bgap;
     if (local >= REPLY) {
       // the reply: just a question mark, in accent
-      const rW = pixelTextWidth('?', scale * 2) + padX * 2;
-      const rH = Math.max(bh, 10 * scale + padY * 2);
-      bubble(g, x0, ry, rW, rH, false, th, lw, 1);
-      pixelText(g, '?', x0 + padX, ry + Math.round((rH - 10 * scale) / 2), ACC(1), { scale: scale * 2 });
+      const rW = pixelTextWidth('?', rs) + padX * 2;
+      bubble(g, x0, ry, rW, replyH, false, th, lw, 1);
+      pixelText(g, '?', x0 + padX, ry + Math.round((replyH - 5 * rs) / 2), ACC(1), { scale: rs });
     } else if (typed >= 1) {
       // waiting for the reply
       caret(g, x0 + padX, ry + padY, th, cw, blink(t));
@@ -178,10 +216,13 @@ function tag(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: nu
 const scene: Scene = {
   paint({ r, box, p, t, mobile }) {
     const g = r.begin();
-    // read act: the forgetful loop; it hands over to the watch story as p leaves 0
-    const story = range(0, 0.04, p);
-    if (story < 1) {
-      g.globalAlpha = 1 - story;
+    // read act: the forgetful loop; it hands over to the watch story as p leaves 0 —
+    // first fading out, then the bubbles fading in (never both at once: the
+    // loop's label would sit on top of the watch act's first bubble)
+    const loop = 1 - range(0, 0.02, p);
+    const story = range(0.02, 0.04, p);
+    if (loop > 0) {
+      g.globalAlpha = loop;
       forgetfulLoop(g, box, t, mobile);
       g.globalAlpha = 1;
     }
@@ -197,7 +238,6 @@ const scene: Scene = {
     const padX = Math.max(2, Math.round(th * 0.7));
     const padY = Math.max(2, Math.round(th * 0.45));
     const framePad = Math.max(3, Math.round(th * 0.75));
-    const bubbleGap = Math.round(th * (mobile ? 0.7 : 0.9));
     const turns = mobile ? TURNS_MOBILE : TURNS;
     const tagCol = Math.round(th * 2.3);
     const tagW = (j: number) => (j % 2 ? tagCol : Math.round(th * 1.6));
@@ -244,9 +284,14 @@ const scene: Scene = {
 
     // A: alternating chat bubbles, centred as a stack
     const bh = rows.map((n) => (n - 1) * pitch + th + padY * 2);
-    const stackH = bh.reduce((a, b) => a + b, 0) + bubbleGap * (turns.length - 1);
+    const bhSum = bh.reduce((a, b) => a + b, 0);
     // (the last bubble's tail hangs below the stack, so it counts too)
     const tailSz = Math.max(2, Math.round(th * 0.9));
+    // stacked outlines keep CLEAR empty rows between them, as far as the box
+    // has room (a very short phone box keeps the tighter base gap)
+    const fits = Math.floor((Math.floor(box.h) - bhSum - tailSz) / (turns.length - 1));
+    const bubbleGap = Math.max(Math.round(th * (mobile ? 0.7 : 0.9)), Math.min(CLEAR + spillOf(lw) * 2, fits));
+    const stackH = bhSum + bubbleGap * (turns.length - 1);
     let ya = Math.round(box.cy - (stackH + tailSz) / 2);
     // B: one framed strip, a role tag at the start of every turn, centred
     const totalRows = rows.reduce((a, b) => a + b, 0);

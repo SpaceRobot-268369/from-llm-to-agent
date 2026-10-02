@@ -103,7 +103,8 @@ reference.
   stages). The art stays in the top band (no focus glide; the hero keeps its
   centred frame); copy and headline cards scroll over solid panels. Watch
   steps flow as a list below a clear window, and the ticker drives those
-  scenes from the list's position (`mobileScene`).
+  scenes from the list's position (`mobileScene`); 1.1's scene and token demo
+  are driven the same way from the demo's position.
 - **Desktop fit.** Each concept's read-act copy must fit 1280×720. Trim the
   copy before shrinking the type.
 - **Phase timing has one source.** Act timings live in

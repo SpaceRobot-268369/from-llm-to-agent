@@ -38,13 +38,15 @@ export const PHASES = {
    * headline → read → watch; the scene holds still while you read, then
    * performs — its clock starts only once the glide and the caption strip have
    * arrived, and it ends early so the last frame holds before the hand-off.
+   * The glide to the centre starts only once the copy has fully faded, so the
+   * moving diagram never crosses text.
    */
   watch: {
     headOut: [0.1, 0.17],
     readIn: [0.15, 0.22],
-    readOut: [0.46, 0.52],
-    focus: [0.47, 0.57],
-    scene: [0.57, 0.9],
+    readOut: [0.44, 0.5],
+    focus: [0.5, 0.58],
+    scene: [0.58, 0.9],
   },
   /** the scaling stage keeps its own timeline (SCALING.phases) after its headline card */
   scaling: {

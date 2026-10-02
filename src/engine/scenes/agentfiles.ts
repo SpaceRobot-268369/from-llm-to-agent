@@ -1,41 +1,45 @@
 /**
- * agentfiles — the map an agent reads first. On the left, a pixel file tree:
- * an index card (AGENTS.MD) with three folder tiles hanging off its trunk
- * (CONTEXT, MEMORY, SKILLS). On the right, the AGENT: a tall session window
- * that starts empty — nothing but a softly pulsing cursor.
+ * agentfiles — memory as a knowledge base of files. One part is a pixel file
+ * tree: the AGENTS.MD index card at the root, a trunk with three folder rows
+ * on branches (CONTEXT, MEMORY, SKILLS), each a solid folder icon and its
+ * name. Opening a folder expands it like a file explorer: its files roll down
+ * under it as leaves on their own branches (SPEC, SETUP · NOTES · STEPS) and
+ * push the folders below down; closing rolls them back up. The other part is
+ * the AGENT: a session window that starts empty, with a softly pulsing cursor.
  *
  * p (scene progress) tells the story:
  *   0    – 0.27  read first: the index card lights up in accent (a wipe), a
- *                short stream of accent lines flows from it into the window
+ *                short stream of accent dashes flows from it into the window
  *                and types the first rows; then the card settles to an accent
  *                outline (it stays loaded) and the rows turn to ink.
- *   0.27 – 0.49  on demand, CONTEXT: the folder opens (inverts), a page
- *                (accent) slides out of it to the window's edge, the agent
- *                types what it read, and the page slides back; the folder
- *                closes again.
- *   0.47 – 0.69  the same for SKILLS: a page of steps (bullets) slides out,
- *                is read, and goes back.
- *   0.70 – 0.95  write back: the agent types a new line (accent) level with
- *                MEMORY; a copy flies straight out of the window into the
- *                folder (the line stays, in ink); the folder glows accent and
- *                fades back, keeping its label lit (it was updated).
+ *   0.27 – 0.48  on demand, CONTEXT: the folder is selected (an ink bar, its
+ *                name knocked out) and expands; its first file lights up
+ *                (accent bar) and a page (accent) slides out of it to the
+ *                window; the agent types what it read; the page goes back,
+ *                the folder collapses.
+ *   0.48 – 0.69  the same for SKILLS: a page of steps (bullets).
+ *   0.69 – 0.95  write back: MEMORY is selected and expands to show NOTES;
+ *                the agent types a new line (accent); a copy flies out of the
+ *                window into NOTES (the line stays, in ink); NOTES glows
+ *                accent and fades back, keeping its name lit (updated).
+ *                MEMORY stays expanded.
  *   0.95 – 1     hold.
- * Unopened folders stay closed and dim: solid outline, a sparse fill.
- * t only pulses the cursor; everything reads at t = 0.
+ * t only pulses the cursor; everything reads at t = 0. On phones the same
+ * story loops in time instead of following the scroll (loopP).
  *
- * The window's rows run in lanes: the index rows under its title bar, then
- * one group level with each folder (CONTEXT's rows · the MEMORY note ·
- * SKILLS' steps), so every page and the note travel straight across between
- * a folder and its own rows.
+ * Arrangements: the tree BESIDE the window ('h', most boxes), or ABOVE it
+ * ('v', tall narrow desktop boxes such as 1024×768). Pages, the stream and the
+ * note travel only in the corridor between the tree's rows and the window (a
+ * column right of the rows), so nothing in flight covers a row; they slide out
+ * from behind a file's bar and in from behind the window's border.
  *
- * Layout: whole cells, the largest kit that fits (cached per box size).
- * ROOMY (desktop side box): padded card and folders with tabs, 2-cell text
- * rows, an AGENT label over the window. MID (smaller desktops): tighter
- * padding, no label, the window level with the card. COMPACT (phones):
- * 1-cell rows (solid ink), folders without tabs. TINY / TINIER (short
- * phones): a solid card and the folders stacked on shared borders, the
- * smallest with no gap under the card and no margin. Pages travel in the gap between the folders and the window, so
- * nothing in flight covers another folder or the agent's rows.
+ * Kits (whole cells, the largest that fits, cached per box size): ROOMY and
+ * MID (desktop side box: selection bars, 2-cell text rows, an AGENT label over
+ * the window), VERT2 / VERT (the vertical arrangement: 1-cell rows and AGENT
+ * knocked out of a taller title bar, worth an index row; VERT shows one file
+ * per folder), COMPACT (phones: no bars — an open folder turns hollow, a lit
+ * file turns accent), TINY / TINIER (short phones: a solid card, one file per
+ * folder, the tightest gaps).
  */
 import { easeInOut, hash2, lerp, range } from '../noise';
 import type { Box, Scene } from './types';
@@ -46,56 +50,101 @@ type G = CanvasRenderingContext2D;
 const INDEX = 'AGENTS.MD';
 const AGENT = 'AGENT';
 const FOLDERS = ['CONTEXT', 'MEMORY', 'SKILLS'] as const;
+/** Each folder's files (the tree's leaves, illustrative), shown while it is expanded; small kits show fewer. */
+const LEAVES: readonly (readonly string[])[] = [['SPEC', 'SETUP'], ['NOTES'], ['STEPS']];
 const MEM = 1;
 /** Pixel-font glyph height (cells). */
 const FONT_H = 5;
 /** Settled text rows: mid-tone ink, secondary to the outlines and labels (1-cell rows stay solid). */
 const ROW_INK = 0.7;
-/** Closed folders: a sparse fill. */
-const DIM = 0.18;
 
 // ── beats (scene progress) ──────────────────────────────────────────────
 /** The index card lights up (wipe). */
 const LIT: [number, number] = [0.03, 0.07];
-/** The stream of lines: first dash leaves, spacing window, flight time. */
+/** The stream of dashes: first dash leaves, spacing window, flight time. */
 const STREAM0 = 0.07;
 const STREAM_SPAN = 0.11;
 const STREAM_FLY = 0.05;
 /** The card settles to an outline, the index rows to ink. */
 const SETTLE: [number, number] = [0.23, 0.27];
-/** One on-demand visit: folder index, its rows' kind, and when each step starts. */
-type Visit = { folder: number; steps: boolean; open: number; out: number; read: number; back: number; close: number };
+/** One on-demand visit: the folder, its file that is read, its rows' kind, and when it starts. */
+type Visit = { folder: number; leaf: number; steps: boolean; at: number };
 const VISITS: Visit[] = [
-  { folder: 0, steps: false, open: 0.27, out: 0.29, read: 0.35, back: 0.41, close: 0.46 },
-  { folder: 2, steps: true, open: 0.47, out: 0.49, read: 0.55, back: 0.61, close: 0.66 },
+  { folder: 0, leaf: 0, steps: false, at: 0.27 },
+  { folder: 2, leaf: 0, steps: true, at: 0.48 },
 ];
-const OPEN_LEN = 0.03;
-const SLIDE_LEN = 0.06;
-const READ_LEN = 0.055;
-/** The new memory line: typed, then flown into MEMORY. */
-const NOTE_TYPE: [number, number] = [0.7, 0.75];
-const NOTE_FLY: [number, number] = [0.76, 0.85];
-/** MEMORY glows accent (wipe in from the right), then fades back. */
+// a visit's steps, as offsets from its start
+/** the folder's bar wipes in */
+const SEL = 0.03;
+/** the files roll down */
+const EXP: [number, number] = [0.01, 0.04];
+/** the file's accent bar wipes in */
+const LEAF_ON = 0.035;
+/** the page slides out to the window */
+const OUT = 0.045;
+const SLIDE_LEN = 0.04;
+/** the agent types two rows */
+const READ = 0.09;
+const READ_LEN = 0.04;
+/** the page slides back, the file goes dark, the folder collapses (its bar wipes out) */
+const BACK = 0.13;
+const LEAF_OFF = 0.165;
+const CLOSE = 0.175;
+const CLOSE_LEN = 0.03;
+/** Write back: MEMORY is selected and expands; the note is typed, then flown into NOTES. */
+const MEM_AT = 0.69;
+const NOTE_TYPE: [number, number] = [0.71, 0.76];
+const NOTE_FLY: [number, number] = [0.77, 0.85];
+/** NOTES glows accent (wipe in from the right), then fades back; MEMORY's bar wipes out. */
 const GLOW_IN: [number, number] = [0.84, 0.87];
 const GLOW_OUT: [number, number] = [0.89, 0.95];
+const MEM_OFF: [number, number] = [0.9, 0.93];
+
+/**
+ * Phones: the art band is only in clear view before the copy scrolls over it,
+ * so there the story plays on a loop in time (as in `system`) — wait, play,
+ * hold the finished picture, then cut back to an empty window (a new
+ * session). t = 0 (reduced motion) holds the finished picture.
+ */
+const LOOP = 12;
+function loopP(t: number): number {
+  if (t === 0) return 1;
+  const s = t % LOOP;
+  if (s < 0.8) return 0;
+  return Math.min(1, (s - 0.8) / 8.4);
+}
 
 // ── kits ────────────────────────────────────────────────────────────────
 
+type Arr = 'h' | 'v';
+
 type Kit = {
-  /** a solid card (no outline: the tiny kit), its padding around the label, the dog-ear size */
+  /** a solid card (no outline: the tiny kits), its padding around the label, the dog-ear size */
   solid: boolean;
   cpx: number;
   cpy: number;
   ear: number;
-  /** folder padding, tab height (0 = none) and tab width */
-  tpx: number;
-  tpy: number;
-  tab: number;
-  tabW: number;
-  /** tiles' indent from the card's left edge, and the trunk's */
-  indent: number;
+  /**
+   * The tree, as offsets from the card's left edge: the trunk; a folder's icon
+   * (x, width) and the gap before its name; a folder's own trunk; a file's
+   * icon (x, width).
+   */
   trunk: number;
-  /** page size, and the gap it travels in (page width + clearance) */
+  fx: number;
+  fw: number;
+  gi: number;
+  sx: number;
+  lx: number;
+  lw: number;
+  /** row pitches (folders, files), selection-bar padding (folders, files; 0 = no bars), gap under the card */
+  pitchF: number;
+  pitchL: number;
+  bp: number;
+  bpL: number;
+  g0: number;
+  /** most files shown per folder */
+  leaves: number;
+  /** page size, and the clearance between the rows and the corridor it travels in */
   pw: number;
   ph: number;
   clear: number;
@@ -104,19 +153,17 @@ type Kit = {
   pitch: number;
   group: number;
   bar: number;
-  /** window width bounds */
+  /** window width bounds (beside the tree) */
   wwMin: number;
   wwMax: number;
-  /** minimum gaps: under the card, between folders */
-  g0: number;
-  g: number;
   /** most extra cells a gap may take */
   gMax: number;
-  /** index rows typed by the stream (at most; fewer when the lanes need the room), and its dashes */
+  /** index rows typed by the stream (at most; fewer when the window needs the room), and its dashes */
   nIdx: number;
   dashes: number;
   /** cursor size */
   cur: [number, number];
+  /** an AGENT label: over the window ('h'), or knocked out of a taller title bar ('v') */
   label: boolean;
   /** smallest margin (cells) when space is tight */
   m0: number;
@@ -125,12 +172,13 @@ type Kit = {
 const ROOMY: Kit = {
   solid: false,
   cpx: 2, cpy: 2, ear: 2,
-  tpx: 2, tpy: 2, tab: 2, tabW: 10,
-  indent: 5, trunk: 2,
-  pw: 6, ph: 8, clear: 2,
-  row: 2, pitch: 4, group: 2, bar: 3,
-  wwMin: 13, wwMax: 17,
-  g0: 3, g: 2, gMax: 3,
+  trunk: 2, fx: 5, fw: 7, gi: 2, sx: 6, lx: 9, lw: 4,
+  pitchF: 8, pitchL: 8, bp: 1, bpL: 1, g0: 3,
+  leaves: 2,
+  pw: 6, ph: 7, clear: 1,
+  row: 2, pitch: 3, group: 2, bar: 3,
+  wwMin: 13, wwMax: 21,
+  gMax: 1,
   nIdx: 3,
   dashes: 6,
   cur: [2, 2],
@@ -138,55 +186,74 @@ const ROOMY: Kit = {
   m0: 1,
 };
 
+/** Smaller desktop boxes: tighter padding and indents, a smaller page. */
+const MID: Kit = { ...ROOMY, cpx: 1, trunk: 1, fx: 3, fw: 6, gi: 1, sx: 4, lx: 7, pw: 5, wwMin: 11 };
+
+/** Tall narrow desktop boxes (tree above the window): 1-cell text rows, a shorter card. */
+const VERT2: Kit = { ...MID, cpy: 1, g0: 2, pitchF: 7, row: 1, pitch: 2, group: 1, bar: 2, nIdx: 2, dashes: 4, cur: [2, 1], gMax: 2, m0: 0 };
+/** …with one file per folder, and no extra space between the text-row groups. */
+const VERT: Kit = { ...VERT2, leaves: 1, group: 0 };
+
+/** Phones: no selection bars, 1-cell rows, the trunk on the card's edge. */
 const COMPACT: Kit = {
   solid: false,
   cpx: 1, cpy: 1, ear: 1,
-  tpx: 1, tpy: 1, tab: 0, tabW: 0,
-  indent: 2, trunk: 0,
-  pw: 4, ph: 5, clear: 1,
+  trunk: 0, fx: 2, fw: 5, gi: 1, sx: 3, lx: 5, lw: 3,
+  pitchF: 7, pitchL: 6, bp: 0, bpL: 0, g0: 1,
+  leaves: 2,
+  pw: 4, ph: 5, clear: 0,
   row: 1, pitch: 2, group: 1, bar: 2,
-  wwMin: 9, wwMax: 12,
-  g0: 1, g: 1, gMax: 3,
+  wwMin: 8, wwMax: 12,
+  gMax: 2,
   nIdx: 2,
   dashes: 4,
   cur: [2, 1],
   label: false,
-  m0: 1,
+  m0: 0,
 };
 
-/** Smaller desktop boxes: the roomy look with tighter padding and a smaller page. */
-const MID: Kit = { ...ROOMY, cpx: 1, tpx: 1, tpy: 1, tabW: 8, indent: 4, pw: 5, ph: 7, pitch: 3, wwMin: 12 };
-
-/** Short phones: a solid index card and the folders stacked, sharing their borders. */
-const TINY: Kit = { ...COMPACT, solid: true, g: -1, gMax: 0, wwMin: 7 };
+/** Short phones: a solid index card, one file per folder, folder rows closer. */
+const TINY: Kit = { ...COMPACT, solid: true, pitchF: 6, leaves: 1, wwMin: 7, m0: 1 };
 /** The smallest phones: the folders right under the card, no margin. */
 const TINIER: Kit = { ...TINY, g0: 0, m0: 0 };
 
+const KITS: [Kit, Arr][] = [
+  [ROOMY, 'h'],
+  [MID, 'h'],
+  [MID, 'v'],
+  [VERT2, 'v'],
+  [VERT, 'v'],
+  [COMPACT, 'h'],
+  [TINY, 'h'],
+  [TINIER, 'h'],
+];
+
 type Lay = Kit & {
+  arr: Arr;
   x0: number;
   y0: number;
   /** card size */
   cw: number;
   ch: number;
-  /** folder: left, width, body height (with outline), body tops, label rows' middles */
-  tx: number;
-  tw: number;
-  bh: number;
-  ty: number[];
-  mid: number[];
+  /** files shown per folder; the first folder row's top */
+  nL: number[];
+  fy0: number;
   wx: number;
   wy: number;
   ww: number;
   wh: number;
-  /** top of the AGENT label, or -1 */
+  /** the AGENT label over the window (top-left), or labelY = -1 */
+  labelX: number;
   labelY: number;
   textX: number;
   textW: number;
   /** text rows (top y): index…, context ×2, skills ×2, the memory note */
   rows: number[];
+  /** the corridor's left edge: pages travel (and dock) at x = cx */
+  cx: number;
 };
 
-function fit(box: Box, k: Kit, force = false): Lay | null {
+function fit(box: Box, k: Kit, arr: Arr, force = false): Lay | null {
   const bx0 = Math.ceil(box.x);
   const bx1 = Math.floor(box.x + box.w);
   const by0 = Math.ceil(box.y);
@@ -196,109 +263,139 @@ function fit(box: Box, k: Kit, force = false): Lay | null {
   const edge = k.solid ? 0 : 2;
   const cw = pixelTextWidth(INDEX) + 2 * k.cpx + edge;
   const ch = FONT_H + 2 * k.cpy + edge;
-  const tw = pixelTextWidth(FOLDERS[0]) + 2 * k.tpx + 2;
-  const bh = FONT_H + 2 * k.tpy + 2;
-  const tileH = k.tab + bh;
-
-  // ── across: tree · gap for a page · window
-  const left = k.indent + tw + k.pw + k.clear;
-  let mx = Math.round(bw * 0.06);
-  let ww = bw - 2 * mx - left;
-  if (ww < k.wwMin) {
-    mx = Math.max(k.m0, Math.floor((bw - left - k.wwMin) / 2));
-    ww = bw - 2 * mx - left;
-  }
-  if (ww < k.wwMin && !force) return null;
-  ww = Math.max(5, Math.min(ww, k.wwMax));
-  const totalW = Math.max(cw, left + ww);
-  const x0 = bx0 + Math.floor((bw - totalW) / 2);
-  const wx = x0 + left;
-  // the AGENT label sits over the window when it clears the card and the box
-  const lw = pixelTextWidth(AGENT);
-  const lx = Math.round(wx + ww / 2 - lw / 2);
-  const label = k.label && lx >= x0 + cw + 1 && lx + lw <= bx1;
-
-  // ── down: card · trunk gap · three folders
-  const needH = ch + k.g0 + 3 * tileH + 2 * k.g;
-  let my = Math.round(bhh * 0.07);
-  let avail = bhh - 2 * my;
-  if (avail < needH) {
-    my = Math.max(k.m0, Math.floor((bhh - needH) / 2));
-    avail = bhh - 2 * my;
-  }
-  if (avail < needH && !force) return null;
-  const extra = Math.max(0, avail - needH);
-  const add = Math.min(k.gMax, Math.floor(extra / 3));
-  const g0 = k.g0 + add;
-  const g = k.g + add;
-  const H = needH + 3 * add;
-  const y0 = by0 + my + Math.floor((avail - H) / 2);
-  const ty: number[] = [];
-  const mid: number[] = [];
-  let y = y0 + ch + g0;
+  const nL = LEAVES.map((l) => Math.min(k.leaves, l.length));
+  // the rows' right edge (bars included)
+  const fnx = k.fx + k.fw + k.gi;
+  const lnx = k.lx + k.lw + k.gi;
+  let rowsW = 0;
   for (let i = 0; i < 3; i++) {
-    ty.push(y + k.tab);
-    mid.push(y + k.tab + 1 + k.tpy + 2);
-    y += tileH + g;
+    rowsW = Math.max(rowsW, fnx + pixelTextWidth(FOLDERS[i]) + k.bp);
+    for (let j = 0; j < nL[i]; j++) rowsW = Math.max(rowsW, lnx + pixelTextWidth(LEAVES[i][j]) + k.bpL);
+  }
+  const maxEx = Math.max(...nL) * k.pitchL;
+
+  // ── across
+  let x0: number;
+  let wx: number;
+  let ww: number;
+  let cx: number;
+  let labelX = 0;
+  let label = false;
+  if (arr === 'h') {
+    // tree · corridor · window
+    const left = rowsW + k.clear + k.pw + 1;
+    let mx = Math.round(bw * 0.06);
+    ww = bw - 2 * mx - left;
+    if (ww < k.wwMin) {
+      mx = Math.max(k.m0, Math.floor((bw - left - k.wwMin) / 2));
+      ww = bw - 2 * mx - left;
+    }
+    if (ww < k.wwMin && !force) return null;
+    ww = Math.max(5, Math.min(ww, k.wwMax));
+    const totalW = Math.max(cw, left + ww);
+    x0 = bx0 + Math.floor((bw - totalW) / 2);
+    // the AGENT label goes over the window, between the card and the box's edge: shift left to make room
+    const lw = pixelTextWidth(AGENT);
+    if (k.label) x0 = Math.max(bx0, Math.min(x0, bx1 - lw - cw - 1));
+    wx = x0 + left;
+    cx = wx - 1 - k.pw;
+    // centred over the window when it can be, else kept inside the box and clear of the card
+    labelX = Math.max(x0 + cw + 1, Math.min(Math.round(wx + ww / 2 - lw / 2), bx1 - lw));
+    label = k.label && labelX + lw <= bx1;
+  } else {
+    // the tree with the corridor on its right; the window under both
+    const totalW = Math.max(cw, rowsW + k.clear + k.pw);
+    if (totalW > bw - 2 * k.m0 && !force) return null;
+    x0 = bx0 + Math.floor((bw - totalW) / 2);
+    wx = x0;
+    ww = totalW;
+    cx = x0 + totalW - k.pw;
   }
 
-  // ── the window: under its label; else level with the card when it clears it, or with the first folder
-  const wy = label ? y0 + FONT_H + 2 : wx > x0 + cw ? y0 : ty[0] - k.tab;
-  const wh = ty[2] + bh - wy;
-  const r0 = wy + k.bar + (k.row > 1 ? 2 : 1);
-  const lane = lanes(k, r0, ty, mid, bh, wy + wh - 2, force);
-  if (!lane) return null;
+  // ── down: heights from y0, for n index rows, a title bar and `add` extra cells per gap
+  const pad = k.row > 1 ? 2 : 1;
+  const winH = (n: number, bar: number) => bar + 2 * pad + (n + 4) * k.pitch + k.row + 3 * k.group + 1;
+  const measure = (n: number, bar: number, add: number) => {
+    // the tree at its tallest (the most files open), and at rest at the end (MEMORY open)
+    const treeH0 = ch + k.g0 + add + 2 * (k.pitchF + add) + FONT_H;
+    const treeH = treeH0 + maxEx;
+    if (arr === 'v') {
+      const top = treeH + 2 + add;
+      return { H: top + winH(n, bar), top, bot: top + winH(n, bar) };
+    }
+    // under its label; else level with the card when the corridor clears the card (pages dock
+    // beside the first rows), or level with the first folder
+    const top = label ? FONT_H + 2 : cx > x0 + cw ? 0 : ch + k.g0 + add - k.bp;
+    const bot = Math.max(treeH0 + nL[MEM] * k.pitchL, top + winH(n, bar));
+    return { H: Math.max(treeH, bot), top, bot };
+  };
+  // margins: 7% of the box, shrunk (down to m0) when that is too tight; null if H does not fit
+  const place = (H: number) => {
+    let my = Math.round(bhh * 0.07);
+    if (bhh - 2 * my < H) my = Math.max(k.m0, Math.floor((bhh - H) / 2));
+    return bhh - 2 * my >= H ? { my, avail: bhh - 2 * my } : null;
+  };
+  // the most index rows that fit; in the vertical arrangement, a title bar with AGENT knocked
+  // out is worth an index row
+  const tall = FONT_H + 2;
+  let n = k.nIdx;
+  let bar = k.bar;
+  let at = null as ReturnType<typeof place>;
+  for (const b of arr === 'v' && k.label ? [tall, k.bar] : [k.bar]) {
+    for (n = k.nIdx; n >= 1 && !(at = place(measure(n, b, 0).H)); n--);
+    if (at) {
+      bar = b;
+      break;
+    }
+  }
+  if (!at) {
+    if (!force) return null;
+    n = 1;
+    at = { my: k.m0, avail: bhh - 2 * k.m0 };
+  }
+  const { my, avail } = at;
+  // spare rows widen the gaps
+  let add = Math.max(0, Math.min(k.gMax, Math.floor((avail - measure(n, bar, 0).H) / 3)));
+  while (add > 0 && measure(n, bar, add).H > avail) add--;
+  const m = measure(n, bar, add);
+  const y0 = by0 + my + Math.floor((avail - m.H) / 2);
+  const wy = y0 + m.top;
+  const wh = m.bot - m.top;
+
+  // ── the window's text rows: the index rows, then a group per visit, then the note
+  const r0 = wy + bar + pad;
+  const rows: number[] = [];
+  for (let i = 0; i < n; i++) rows.push(r0 + i * k.pitch);
+  let y = rows[n - 1];
+  for (const size of [2, 2, 1]) {
+    y += k.group;
+    for (let j = 0; j < size; j++) rows.push((y += k.pitch));
+  }
 
   return {
     ...k,
-    nIdx: lane.n,
+    pitchF: k.pitchF + add,
+    g0: k.g0 + add,
+    bar,
+    nIdx: n,
+    arr,
     x0,
     y0,
     cw,
     ch,
-    tx: x0 + k.indent,
-    tw,
-    bh,
-    ty,
-    mid,
+    nL,
+    fy0: y0 + ch + k.g0 + add,
     wx,
     wy,
     ww,
     wh,
+    labelX,
     labelY: label ? y0 : -1,
     textX: wx + 2,
     textW: ww - 4,
-    rows: lane.rows,
+    rows,
+    cx,
   };
-}
-
-/**
- * The window's text rows: the index rows under the title bar, then one lane
- * per folder, level with it (CONTEXT ×2 · the MEMORY note · SKILLS ×2), so a
- * page or the note travels straight across between a folder and its rows.
- * Drops index rows until every lane sits inside its folder's height.
- * Rows come back in paint order: index…, context ×2, skills ×2, the note.
- */
-function lanes(k: Kit, r0: number, ty: number[], mid: number[], bh: number, end: number, force: boolean) {
-  const size = [2, 1, 2];
-  const span = (n: number) => (n - 1) * k.pitch + k.row;
-  const sep = k.pitch + k.group;
-  for (let n = k.nIdx; n >= 1; n--) {
-    const top: number[] = [];
-    let prev = r0 + (n - 1) * k.pitch;
-    for (let f = 0; f < 3; f++) {
-      top[f] = Math.max(Math.round(mid[f] + 0.5 - span(size[f]) / 2), prev + sep);
-      prev = top[f] + (size[f] - 1) * k.pitch;
-    }
-    const level = top.every((y, f) => y >= ty[f] && y + span(size[f]) <= ty[f] + bh);
-    if ((level && top[2] + span(2) <= end) || (force && n === 1)) {
-      const rows: number[] = [];
-      for (let i = 0; i < n; i++) rows.push(r0 + i * k.pitch);
-      rows.push(top[0], top[0] + k.pitch, top[2], top[2] + k.pitch, top[1]);
-      return { n, rows };
-    }
-  }
-  return null;
 }
 
 const layCache = new Map<string, Lay>();
@@ -306,7 +403,8 @@ function layout(box: Box): Lay {
   const key = `${box.x.toFixed(1)}|${box.y.toFixed(1)}|${box.w.toFixed(1)}|${box.h.toFixed(1)}`;
   let L = layCache.get(key);
   if (L) return L;
-  L = fit(box, ROOMY) ?? fit(box, MID) ?? fit(box, COMPACT) ?? fit(box, TINY) ?? fit(box, TINIER) ?? (fit(box, TINIER, true) as Lay);
+  for (const [k, arr] of KITS) if ((L = fit(box, k, arr) ?? undefined)) break;
+  L ??= fit(box, TINIER, 'h', true) as Lay;
   if (layCache.size > 32) layCache.clear();
   layCache.set(key, L);
   return L;
@@ -361,6 +459,22 @@ function bar(g: G, x: number, y: number, w: number, h: number, inked: number) {
   }
 }
 
+/** A point `s` (0..1) of the way along a polyline, in whole cells. */
+function along(pts: [number, number][], s: number): [number, number] {
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+  let d = s * total;
+  for (let i = 1; i < pts.length; i++) {
+    const [ax, ay] = pts[i - 1];
+    const [bx, by] = pts[i];
+    const len = Math.hypot(bx - ax, by - ay);
+    if (d <= len && len > 0) return [Math.round(lerp(ax, bx, d / len)), Math.round(lerp(ay, by, d / len))];
+    d -= len;
+  }
+  const [x, y] = pts[pts.length - 1];
+  return [Math.round(x), Math.round(y)];
+}
+
 // ── pieces ──────────────────────────────────────────────────────────────
 
 /** The index card: a dog-eared page, outlined or solid, with its label. */
@@ -385,42 +499,85 @@ function card(g: G, L: Lay, mode: 'line' | 'solid', style: string) {
   pixelText(g, INDEX, lx, ly, style);
 }
 
-/** Top-left of folder i's label (centred in the body). */
-function folderLabel(L: Lay, i: number): [number, number] {
-  return [L.tx + Math.floor((L.tw - pixelTextWidth(FOLDERS[i])) / 2), L.ty[i] + 1 + L.tpy];
-}
+/** One tree row: an icon at x (folder or file), its name at nx; `pad` = its bar's padding. */
+type Row = { x: number; y: number; iw: number; nx: number; name: string; file: boolean; pad: number };
 
-/** One folder tile: closed (outline, sparse fill, solid label) or solid with the label knocked out. */
-function folder(g: G, L: Lay, i: number, mode: 'closed' | 'solid', style: string) {
-  const x = L.tx;
-  const y = L.ty[i];
-  const { tw, bh, tab, tabW } = L;
-  const [lx, ly] = folderLabel(L, i);
-  if (tab > 0) {
-    rect(g, x + 1, y - tab, tabW - 2, 1, style);
-    rect(g, x, y - tab + 1, tabW, tab - 1, style);
-  }
-  if (mode === 'solid') {
-    rect(g, x, y, tw, bh, style);
-    knock(g, FOLDERS[i], lx, ly);
+/** A folder: solid (closed) or hollow (open), with a tab. A file: an outlined, dog-eared page. */
+function icon(g: G, R: Row, style: string, open: boolean) {
+  const { x, y, iw: w } = R;
+  if (!R.file) {
+    rect(g, x, y, Math.max(2, w >> 1), 1, style);
+    if (!open) return rect(g, x, y + 1, w, FONT_H - 1, style);
+    rect(g, x, y + 1, w, 1, style);
+    rect(g, x, y + FONT_H - 1, w, 1, style);
+    rect(g, x, y + 2, 1, FONT_H - 3, style);
+    rect(g, x + w - 1, y + 2, 1, FONT_H - 3, style);
     return;
   }
-  rect(g, x, y, tw, 1, style);
-  rect(g, x, y + bh - 1, tw, 1, style);
-  rect(g, x, y + 1, 1, bh - 2, style);
-  rect(g, x + tw - 1, y + 1, 1, bh - 2, style);
-  // a sparse fill around (never inside) the label's box
-  const lw = pixelTextWidth(FOLDERS[i]);
-  const ix = x + 1;
-  const iy = y + 1;
-  const iw = tw - 2;
-  const ih = bh - 2;
-  const dim = INK(DIM);
-  rect(g, ix, iy, iw, ly - iy, dim);
-  rect(g, ix, ly + FONT_H, iw, iy + ih - (ly + FONT_H), dim);
-  rect(g, ix, ly, lx - ix, FONT_H, dim);
-  rect(g, lx + lw, ly, ix + iw - (lx + lw), FONT_H, dim);
-  pixelText(g, FOLDERS[i], lx, ly, style);
+  if (w >= 4) {
+    rect(g, x, y, w - 1, 1, style);
+    rect(g, x + w - 2, y + 1, 2, 1, style);
+    rect(g, x, y + 1, 1, FONT_H - 1, style);
+    rect(g, x + w - 1, y + 2, 1, FONT_H - 2, style);
+    rect(g, x + 1, y + FONT_H - 1, w - 2, 1, style);
+    return;
+  }
+  rect(g, x, y, 2, 1, style);
+  rect(g, x, y + 1, 3, 1, style);
+  rect(g, x, y + 2, 1, FONT_H - 2, style);
+  rect(g, x + 2, y + 2, 1, FONT_H - 2, style);
+  rect(g, x + 1, y + FONT_H - 1, 1, 1, style);
+}
+
+/** A row's bar box: [x, y, w, h]. */
+function barBox(R: Row): [number, number, number, number] {
+  return [R.x - R.pad, R.y - R.pad, R.nx + pixelTextWidth(R.name) + 2 * R.pad - R.x, FONT_H + 2 * R.pad];
+}
+
+/** The part [a, b) of a row's bar that shows, from a wipe in (fin) and a wipe out (fout), left to right. */
+function wipe(R: Row, fin: number, fout: number): [number, number] {
+  const [bx, , bw] = barBox(R);
+  return [bx + Math.round(fout * bw), bx + Math.round(fin * bw)];
+}
+
+/**
+ * A row: plain (icon and name in `style`), and over [a, b) a bar in `hi` with
+ * the icon and name knocked out — or, without bar padding, the row redrawn in `hi`.
+ */
+function drawRow(g: G, R: Row, style: string, open: boolean, hi: string | null, a: number, b: number) {
+  cut(g, R.x, R.y, R.nx + pixelTextWidth(R.name) - R.x, FONT_H);
+  icon(g, R, style, open);
+  pixelText(g, R.name, R.nx, R.y, style);
+  if (!hi || b <= a) return;
+  const [bx, by, bw, bh] = barBox(R);
+  clipped(g, a, by, b - a, bh, () => {
+    cut(g, bx, by, bw, bh);
+    if (R.pad > 0) {
+      rect(g, bx, by, bw, bh, hi);
+      g.globalCompositeOperation = 'destination-out';
+      icon(g, R, '#000', open);
+      pixelText(g, R.name, R.nx, R.y, '#000');
+      g.globalCompositeOperation = 'lighter';
+    } else {
+      icon(g, R, hi, open);
+      pixelText(g, R.name, R.nx, R.y, hi);
+    }
+  });
+}
+
+function folderRow(L: Lay, i: number, y: number): Row {
+  const x = L.x0 + L.fx;
+  return { x, y, iw: L.fw, nx: x + L.fw + L.gi, name: FOLDERS[i], file: false, pad: L.bp };
+}
+
+function fileRow(L: Lay, i: number, j: number, fy: number): Row {
+  const x = L.x0 + L.lx;
+  return { x, y: fy + (j + 1) * L.pitchL, iw: L.lw, nx: x + L.lw + L.gi, name: LEAVES[i][j], file: true, pad: L.bpL };
+}
+
+/** Where a page sits when it is tucked behind a file's row (its right edge on the bar's). */
+function tucked(L: Lay, R: Row): [number, number] {
+  return [R.nx + pixelTextWidth(R.name) + R.pad - L.pw, R.y + (FONT_H >> 1) - (L.ph >> 1)];
 }
 
 /** A page in flight: accent, its text cut in dark (plain lines, or bullet steps). */
@@ -455,21 +612,23 @@ function rowLen(L: Lay, i: number, steps: boolean) {
 }
 
 const scene: Scene = {
-  paint({ r, box, p, t }) {
+  paint({ r, box, p: scroll, t, mobile }) {
     const g = r.begin();
+    const p = mobile ? loopP(t) : scroll;
     const L = layout(box);
-    const { row, rows, textX, pw, ph } = L;
-    const tileR = L.tx + L.tw - 1;
+    const { row, rows, textX, pw, ph, x0, y0, cx } = L;
+    const { wx, wy, ww, wh } = L;
+    const vert = L.arr === 'v';
     const nI = L.nIdx;
     const noteRow = nI + 4;
 
-    // ── the window: outline, title bar, label over it
-    const { wx, wy, ww, wh } = L;
+    // ── the window: outline, title bar, its label
     rect(g, wx, wy, ww, L.bar, INK(1));
     rect(g, wx, wy + wh - 1, ww, 1, INK(1));
     rect(g, wx, wy + L.bar, 1, wh - L.bar - 1, INK(1));
     rect(g, wx + ww - 1, wy + L.bar, 1, wh - L.bar - 1, INK(1));
-    if (L.labelY >= 0) pixelText(g, AGENT, wx + ww / 2, L.labelY, INK(1), { align: 'center' });
+    if (L.bar >= FONT_H + 2) knock(g, AGENT, Math.round(wx + ww / 2 - pixelTextWidth(AGENT) / 2), wy + 1);
+    if (L.labelY >= 0) pixelText(g, AGENT, L.labelX, L.labelY, INK(1));
 
     // ── text rows: what the agent knows so far
     // [typed fraction, inked fraction] per row; the cursor follows the last
@@ -489,8 +648,8 @@ const scene: Scene = {
     // each visit types two rows while its page is docked
     for (let v = 0; v < VISITS.length; v++) {
       const V = VISITS[v];
-      const read = range(V.read, V.read + READ_LEN, p) * 2;
-      const ink = range(V.close, V.close + 0.04, p);
+      const read = range(V.at + READ, V.at + READ + READ_LEN, p) * 2;
+      const ink = range(V.at + CLOSE, V.at + CLOSE + 0.04, p);
       for (let j = 0; j < 2; j++) {
         typed[nI + 2 * v + j] = Math.min(1, Math.max(0, read - j));
         inked[nI + 2 * v + j] = ink;
@@ -527,93 +686,125 @@ const scene: Scene = {
 
     // ── the index card: lights up, then settles to a lit outline
     const lit = range(LIT[0], LIT[1], p);
-    cut(g, L.x0, L.y0, L.cw, L.ch);
+    cut(g, x0, y0, L.cw, L.ch);
     if (settle > 0) {
-      const xs = L.x0 + Math.round(settle * L.cw);
-      clipped(g, L.x0, L.y0, xs - L.x0, L.ch, () => card(g, L, 'line', ACC(1)));
-      clipped(g, xs, L.y0, L.x0 + L.cw - xs, L.ch, () => card(g, L, 'solid', ACC(1)));
+      const xs = x0 + Math.round(settle * L.cw);
+      clipped(g, x0, y0, xs - x0, L.ch, () => card(g, L, 'line', ACC(1)));
+      clipped(g, xs, y0, x0 + L.cw - xs, L.ch, () => card(g, L, 'solid', ACC(1)));
     } else if (lit > 0) {
-      const xs = L.x0 + Math.round(lit * L.cw);
-      clipped(g, L.x0, L.y0, xs - L.x0, L.ch, () => card(g, L, 'solid', ACC(1)));
-      clipped(g, xs, L.y0, L.x0 + L.cw - xs, L.ch, () => card(g, L, 'line', INK(1)));
+      const xs = x0 + Math.round(lit * L.cw);
+      clipped(g, x0, y0, xs - x0, L.ch, () => card(g, L, 'solid', ACC(1)));
+      clipped(g, xs, y0, x0 + L.cw - xs, L.ch, () => card(g, L, 'line', INK(1)));
     } else card(g, L, 'line', INK(1));
 
-    // ── the tree: a trunk from the card, a branch to each folder
-    const trunkX = L.x0 + L.trunk;
-    rect(g, trunkX, L.y0 + L.ch, 1, L.mid[2] - (L.y0 + L.ch) + 1, INK(1));
-    for (let i = 0; i < 3; i++) rect(g, trunkX + 1, L.mid[i], L.tx - trunkX - 1, 1, INK(1));
+    // ── the tree's state: how far each folder is expanded (cells), and where its row sits
+    const ex = [0, 0, 0];
+    for (const V of VISITS) {
+      const e = range(V.at + EXP[0], V.at + EXP[1], p) - range(V.at + CLOSE, V.at + CLOSE + CLOSE_LEN, p);
+      ex[V.folder] = Math.round(easeInOut(e) * L.nL[V.folder] * L.pitchL);
+    }
+    ex[MEM] = Math.round(easeInOut(range(MEM_AT + EXP[0], MEM_AT + EXP[1], p)) * L.nL[MEM] * L.pitchL);
+    const fy = [L.fy0, 0, 0];
+    for (let i = 1; i < 3; i++) fy[i] = fy[i - 1] + L.pitchF + ex[i - 1];
+    /** the files' strip under folder i (rolls down as it expands) */
+    const strip = (i: number, fn: () => void) =>
+      clipped(g, x0, fy[i] + FONT_H, L.cx - x0, ex[i] + L.bpL, fn);
+
+    // ── the tree's lines: the trunk from the card with a branch to each folder, and each open folder's own
+    const trunkX = x0 + L.trunk;
+    rect(g, trunkX, y0 + L.ch, 1, fy[2] + 2 - (y0 + L.ch) + 1, INK(1));
+    for (let i = 0; i < 3; i++) {
+      rect(g, trunkX + 1, fy[i] + 2, x0 + L.fx - trunkX - 1, 1, INK(1));
+      if (ex[i] <= 0) continue;
+      strip(i, () => {
+        const sx = x0 + L.sx;
+        rect(g, sx, fy[i] + FONT_H, 1, L.nL[i] * L.pitchL + 2 - FONT_H + 1, INK(1));
+        for (let j = 0; j < L.nL[i]; j++) rect(g, sx + 1, fy[i] + (j + 1) * L.pitchL + 2, x0 + L.lx - sx - 1, 1, INK(1));
+      });
+    }
 
     // ── the stream: accent dashes from the card into the window
     const dl = row > 1 ? 3 : 2;
-    const sx = wx > L.x0 + L.cw ? L.x0 + L.cw : Math.min(L.x0 + L.cw - 3, wx + 2);
-    const sy = wx > L.x0 + L.cw ? Math.max(L.y0 + 2, Math.min(rows[0], L.y0 + L.ch - 3)) : L.y0 + L.ch;
+    const besideCard = wy < y0 + L.ch;
     for (let i = 0; i < N; i++) {
       const s = range(dashT(i), dashT(i) + STREAM_FLY, p);
       if (s <= 0 || s >= 1) continue;
       const e = easeInOut(s);
-      const x = Math.round(lerp(sx, textX, e));
-      const y = Math.round(lerp(sy, rows[dashRow(i)], e));
+      let x: number;
+      let y: number;
+      if (vert) {
+        // down the corridor, into the window's top
+        const dx = cx + ((pw - dl) >> 1);
+        const start: [number, number][] =
+          x0 + L.cw > dx ? [[dx, y0 + L.ch]] : [[x0 + L.cw, y0 + 2], [dx, y0 + 2]];
+        [x, y] = along([...start, [dx, wy - row]], e);
+      } else {
+        const sx = besideCard ? x0 + L.cw : Math.min(x0 + L.cw - 3, wx + 2);
+        const sy = besideCard ? Math.max(y0 + 2, Math.min(rows[0], y0 + L.ch - 3)) : y0 + L.ch;
+        x = Math.round(lerp(sx, textX, e));
+        y = Math.round(lerp(sy, rows[dashRow(i)], e));
+      }
       cut(g, x, y, dl, row);
       rect(g, x, y, dl, row, ACC(1));
     }
 
-    // ── pages in flight (drawn before the folders, so they slide out from behind)
-    for (let v = 0; v < VISITS.length; v++) {
-      const V = VISITS[v];
-      const s = range(V.out, V.out + SLIDE_LEN, p) - range(V.back, V.back + SLIDE_LEN, p);
-      if (s <= 0) continue;
-      // out of the folder first, then along the gap to its rows
-      const x0 = tileR - pw;
-      const y0 = L.mid[V.folder] - (ph >> 1);
-      const x1 = tileR + 2;
-      const r0 = rows[nI + 2 * v];
-      const y1 = Math.round((r0 + rows[nI + 2 * v + 1] + row) / 2 - ph / 2);
-      const hx = easeInOut(range(0, 0.55, s));
-      const vy = easeInOut(range(0.45, 1, s));
-      page(g, Math.round(lerp(x0, x1, hx)), Math.round(lerp(y0, y1, vy)), pw, ph, V.steps, 11 + v);
-    }
-    // a copy of the memory note flies straight across, out of the window into MEMORY
-    if (noteFly > 0 && noteFly < 1) {
-      const len = rowLen(L, noteRow, false);
-      const x = Math.round(lerp(textX, tileR - len, easeInOut(noteFly)));
-      const y = rows[noteRow];
-      cut(g, x, y, len, row);
-      rect(g, x, y, len, row, ACC(1));
-    }
+    // ── pages in flight (drawn before the rows, so they slide out from behind a file's bar,
+    //    and kept off the window, so the note slides out from behind its border)
+    /** where a page docks beside the window: above it (vertical), or level with text rows a…b */
+    const dock = (a: number, b: number): [number, number] =>
+      vert ? [cx, wy - ph - 1] : [cx, Math.round((rows[a] + rows[b] + row) / 2 - ph / 2)];
+    const offWindow = (fn: () => void) => (vert ? clipped(g, 0, 0, r.w, wy, fn) : clipped(g, 0, 0, wx, r.h, fn));
+    offWindow(() => {
+      for (let v = 0; v < VISITS.length; v++) {
+        const V = VISITS[v];
+        const s =
+          range(V.at + OUT, V.at + OUT + SLIDE_LEN, p) - range(V.at + BACK, V.at + BACK + SLIDE_LEN, p);
+        if (s <= 0) continue;
+        const [px, py] = tucked(L, fileRow(L, V.folder, V.leaf, fy[V.folder]));
+        const [dx, dy] = dock(nI + 2 * v, nI + 2 * v + 1);
+        const [x, y] = along([[px, py], [cx, py], [dx, dy]], easeInOut(s));
+        page(g, x, y, pw, ph, V.steps, 11 + v);
+      }
+      // a copy of the memory note flies out of the window, along the corridor, into NOTES
+      if (noteFly > 0 && noteFly < 1) {
+        const [px, py] = tucked(L, fileRow(L, MEM, 0, fy[MEM]));
+        const [dx, dy] = dock(noteRow, noteRow);
+        const from: [number, number][] = vert ? [[cx, wy + 1]] : [[wx + 1, dy], [dx, dy]];
+        const [x, y] = along([...from, [cx, py], [px, py]], easeInOut(noteFly));
+        page(g, x, y, pw, ph, false, 17);
+      }
+    });
 
-    // ── folders: closed, the one being read solid, MEMORY glowing
+    // ── the rows: folders (selected = an ink bar), their files while expanded (lit = an accent bar)
     const glowIn = range(GLOW_IN[0], GLOW_IN[1], p);
     const glowOut = range(GLOW_OUT[0], GLOW_OUT[1], p);
     for (let i = 0; i < 3; i++) {
-      const x = L.tx;
-      const y = L.ty[i] - L.tab;
-      const h = L.tab + L.bh;
-      cut(g, x, y, L.tw, h);
-      const updated = i === MEM && glowIn >= 1;
-      folder(g, L, i, 'closed', INK(1));
-      if (updated) {
-        // its label stays lit: the folder was updated
-        const [lx, ly] = folderLabel(L, i);
-        cut(g, lx, ly, pixelTextWidth(FOLDERS[i]), FONT_H);
-        pixelText(g, FOLDERS[i], lx, ly, ACC(1));
-      }
-      // open (solid) while it is being read: wipes in, then out, left to right
+      const R = folderRow(L, i, fy[i]);
+      let sel: [number, number] = [0, 0];
       for (const V of VISITS) {
         if (V.folder !== i) continue;
-        const a = x + Math.round(range(V.close, V.close + OPEN_LEN, p) * L.tw);
-        const b = x + Math.round(range(V.open, V.open + OPEN_LEN, p) * L.tw);
-        clipped(g, a, y, b - a, h, () => {
-          cut(g, x, y, L.tw, h);
-          folder(g, L, i, 'solid', INK(1));
-        });
+        sel = wipe(R, range(V.at, V.at + SEL, p), range(V.at + CLOSE, V.at + CLOSE + CLOSE_LEN, p));
       }
-      if (i === MEM && glowIn > 0 && glowOut < 1) {
-        const a = Math.max(x + L.tw - Math.round(glowIn * L.tw), x + Math.round(glowOut * L.tw));
-        clipped(g, a, y, x + L.tw - a, h, () => {
-          cut(g, x, y, L.tw, h);
-          folder(g, L, i, 'solid', ACC(1));
-        });
-      }
+      if (i === MEM) sel = wipe(R, range(MEM_AT, MEM_AT + SEL, p), range(MEM_OFF[0], MEM_OFF[1], p));
+      drawRow(g, R, INK(1), ex[i] > 0, L.bp > 0 ? INK(1) : null, sel[0], sel[1]);
+      if (ex[i] <= 0) continue;
+      strip(i, () => {
+        for (let j = 0; j < L.nL[i]; j++) {
+          const F = fileRow(L, i, j, fy[i]);
+          let lit: [number, number] = [0, 0];
+          for (const V of VISITS) {
+            if (V.folder !== i || V.leaf !== j) continue;
+            lit = wipe(F, range(V.at + LEAF_ON, V.at + LEAF_ON + 0.015, p), range(V.at + LEAF_OFF, V.at + LEAF_OFF + 0.015, p));
+          }
+          // NOTES: glows in from the right as the note arrives, fades back, keeps its name lit
+          const notes = i === MEM && j === 0;
+          if (notes && glowIn > 0 && glowOut < 1) {
+            const [bx, , bw] = barBox(F);
+            lit = [Math.max(bx + bw - Math.round(glowIn * bw), bx + Math.round(glowOut * bw)), bx + bw];
+          }
+          drawRow(g, F, notes && glowIn >= 1 ? ACC(1) : INK(1), false, ACC(1), lit[0], lit[1]);
+        }
+      });
     }
 
     r.commit();

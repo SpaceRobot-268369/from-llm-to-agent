@@ -1,11 +1,14 @@
 /**
- * thinking — more tokens before the answer. A solid question row on top, a
- * dashed scratchpad of "working" tokens in the middle (accent: the new idea),
- * and the solid answer at the bottom. Scrolling turns up the effort meter on the right: the
- * scratchpad grows row by row (the typing head pulses softly), and the answer
- * is pushed further down — same engine, more tokens spent first.
+ * thinking — chain of thought: more tokens before the answer. A solid
+ * question row on top, a dashed scratchpad of "working" tokens in the middle
+ * (dashed: usually hidden), and the answer at the bottom. Scrolling turns up
+ * the effort meter on the right: the scratchpad is written out row by row
+ * (the typing head pulses softly) and pushes the answer's slot further down.
+ * The answer is only a faint slot while the working is being written; it
+ * lands, solid, once the working is done — same engine, the next tokens
+ * spent first.
  */
-import { hash2, range, easeInOut } from '../noise';
+import { hash2, range, easeInOut, smoothstep } from '../noise';
 import type { Scene } from './types';
 import { ACC, INK, blink, fillRound, space, strokeRound } from './helpers';
 
@@ -39,6 +42,8 @@ const scene: Scene = {
     // effort: 1 → 6 scratch rows across the scroll
     const effort = easeInOut(range(0.05, 0.85, p));
     const rowsF = 1.2 + (MAX_ROWS - 1.2) * effort;
+    // the working is done: the answer lands and the typing head stops
+    const done = smoothstep(0.85, 0.93, p);
 
     const tokenRow = (y: number, widths: number[], style: string, limit = Infinity) => {
       let x = left;
@@ -84,12 +89,13 @@ const scene: Scene = {
       headY = ry;
     }
     // typing head: a soft-pulsing cursor at the end of the working
-    if (headX + th <= right + gap * 4) fillRound(g, headX, headY, Math.max(1, Math.round(th * 0.6)), th, 1, ACC(0.9 * blink(t)));
+    if (done < 1 && headX + th <= right + gap * 4)
+      fillRound(g, headX, headY, Math.max(1, Math.round(th * 0.6)), th, 1, ACC(0.9 * blink(t) * (1 - done)));
 
     y += scratchH + Math.round(pitch * 0.9);
 
-    // the answer — appears after the working
-    tokenRow(y, ANSWER, INK(1));
+    // the answer comes after the working: a faint slot until it is done
+    tokenRow(y, ANSWER, INK(0.3 + 0.7 * done));
 
     // effort meter: six cells, filled from the bottom
     const mw = Math.max(5, Math.round(L(0.2)));

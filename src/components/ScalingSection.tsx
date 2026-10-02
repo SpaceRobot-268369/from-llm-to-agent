@@ -51,6 +51,13 @@ export function ScalingSection({ s, index }: { s: SectionData; index: number }) 
     let lastActive = -1;
     let lastParams = '';
     let lastZoom = '';
+    // The chart is LAID OUT at its zoomed size (CSS --cs = S, every inner size
+    // multiplied by it) and scaled down by 1/S into its corner spot. So the
+    // zoom only ever scales it down — at full zoom it renders 1:1, with crisp
+    // text and edges, instead of as an enlarged bitmap of the small chart.
+    let S = 1;
+    let geoKey = '';
+    const geo = { x: 0, y: 0, w: 0, h: 0, ox: 0, oy: 0, pw: 0, ph: 0 };
     return ticker.onFrame((f) => {
       if (f.cur !== index && f.next !== index) return;
       const p = f.progress[index];
@@ -98,23 +105,44 @@ export function ScalingSection({ s, index }: { s: SectionData; index: number }) 
       dotRef.current!.setAttribute('y', (pt.y - 4).toFixed(1));
 
       // the ending: question fades → the chart zooms to the centre and holds →
-      // the chart leaves → next topic. (Mobile hides the chart.)
+      // the chart leaves → next topic. (Mobile shows the chart only for the zoom.)
       const chart = chartRef.current!;
       const z = smoothstep(PH.chartZoom, PH.chartZoomEnd, p);
       const out = range(PH.chartOut, PH.chartOutEnd, p);
-      const zoomKey = `${z}|${f.vw}|${f.vh}`;
+      // re-measured on resize, and as the zoom starts (late font loads may have moved it)
+      const gk = `${f.vw}|${f.vh}|${f.mobile ? 1 : 0}|${z > 0 ? 1 : 0}`;
+      if (gk !== geoKey && chart.offsetWidth > 0) {
+        // zoomed size: up to 62% of the stage, at most 2.6× the small chart
+        const parent = chart.offsetParent as HTMLElement | null;
+        geo.pw = parent?.clientWidth ?? f.vw;
+        geo.ph = parent?.clientHeight ?? f.vh;
+        const w1 = chart.offsetWidth / S;
+        const h1 = chart.offsetHeight / S;
+        S = Math.max(1, Math.min(2.6, (geo.pw * 0.62) / w1, (geo.ph * 0.62) / h1));
+        chart.style.setProperty('--cs', S.toFixed(4));
+        // the layout box at that size, and the corner it shrinks toward (CSS transform-origin)
+        const o = getComputedStyle(chart).transformOrigin.split(' ').map(parseFloat);
+        geo.x = chart.offsetLeft;
+        geo.y = chart.offsetTop;
+        geo.w = chart.offsetWidth;
+        geo.h = chart.offsetHeight;
+        geo.ox = o[0] || 0;
+        geo.oy = o[1] || 0;
+        geoKey = gk;
+        lastZoom = '';
+      }
+      const zoomKey = `${z}|${geoKey}`;
       if (zoomKey !== lastZoom) {
-        if (z > 0) {
-          const parent = chart.offsetParent as HTMLElement | null;
-          const pw = parent?.clientWidth ?? f.vw;
-          const ph = parent?.clientHeight ?? f.vh;
-          const cx = chart.offsetLeft + chart.offsetWidth / 2;
-          const cy = chart.offsetTop + chart.offsetHeight / 2;
-          const scale = Math.max(1, Math.min(2.6, (pw * 0.62) / chart.offsetWidth, (ph * 0.62) / chart.offsetHeight));
-          chart.style.transform = `translate(${((pw / 2 - cx) * z).toFixed(1)}px, ${((ph / 2 - cy) * z).toFixed(1)}px) scale(${(1 + (scale - 1) * z).toFixed(3)})`;
-        } else {
-          chart.style.transform = '';
-        }
+        const { x, y, w, h, ox, oy, pw, ph } = geo;
+        const s = lerp(1 / S, 1, z);
+        // the chart's centre (layout coords): at rest, scaled about the origin; zoomed, the stage centre
+        const cx = lerp(ox + (w / 2 - ox) / S, pw / 2 - x, z);
+        const cy = lerp(oy + (h / 2 - oy) / S, ph / 2 - y, z);
+        // snap to device pixels so the full-zoom frame is sharp
+        const dpr = window.devicePixelRatio || 1;
+        const tx = Math.round((cx - ox - s * (w / 2 - ox)) * dpr) / dpr;
+        const ty = Math.round((cy - oy - s * (h / 2 - oy)) * dpr) / dpr;
+        chart.style.transform = `translate(${tx}px, ${ty}px) scale(${s.toFixed(4)})`;
         lastZoom = zoomKey;
       }
       chart.style.setProperty('--chart-out', out.toFixed(3));

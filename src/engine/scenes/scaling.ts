@@ -3,8 +3,14 @@
  * direction and converge on the centre of the art box, where each one lands on
  * its own cell of a fixed target picture: a brain (two bumpy lobes, a centre
  * fissure, meandering folds). The more pixels have arrived — the bigger the
- * model — the clearer the brain gets. Once it is fairly clear, a small,
- * friendly face opens on its lower left: the intelligence showing up.
+ * model — the clearer the brain gets.
+ *
+ * Colour = intelligence. Every fold of the brain (a patch between grooves)
+ * owns one colour of the fixed vivid palette (Raster.col → VIVID). A small
+ * model is plain ink; as the parameters grow, more incoming pixels arrive in
+ * colour and more of the landed folds light up, fold by fold, until the
+ * frontier brain is a full multi-colour map. The rim stays ink, so the
+ * silhouette holds on any background.
  *
  * p is the RAW section progress (the scaling stage keeps its own timeline,
  * SCALING.phases):
@@ -17,23 +23,22 @@
  *                       border on the ray through its target, flies in
  *                       (decelerating, paper-white accent with a short streak),
  *                       lands with a brief white glint, then settles to ink.
- *                       The ghost fades as the real pixels take over. The face
- *                       opens from its middle over growth 0.55 … 0.68 (eyes
- *                       first, then the smile).
- *   growEnd … copyOut   hold: the finished brain + face
- *   copyOut …           unclipped (no copy column any more): the face closes,
- *                       the brain drifts to the centre of the screen and
- *                       erodes cell by cell (exact halftone steps, no dither
+ *                       The ghost fades as the real pixels take over.
+ *   growEnd … copyOut   hold: the finished brain
+ *   copyOut …           unclipped (no copy column any more): the brain
+ *                       drifts to the centre of the screen and erodes cell
+ *                       by cell (exact halftone steps, no dither
  *                       churn) into a light fog of fine dots behind the plateau
  *                       question (questionStart … questionEnd)
  *   chartZoom … chartZoomEnd  the fog dissolves — the DOM chart takes over;
  *                       nothing is painted after that
  *
  * t only drives ambient motion: a trickle of incoming specks while the brain
- * is unfinished, and the face's slow, soft blink (the eyes close row by row).
+ * is unfinished.
  * At t = 0 every frame reads.
  */
 import { SCALING } from '../../content/sections';
+import { VIVID } from '../color';
 import type { Raster } from '../raster';
 import { clamp, easeInOut, hash2, lerp, range, smoothstep } from '../noise';
 import type { Box, Scene } from './types';
@@ -53,14 +58,18 @@ const GLINT = 0.025;
 const STREAK = 6;
 /** ambient specks trickling in while the brain is unfinished */
 const TRICKLE = 12;
-/** the face blinks every BLINK seconds; one blink lasts BLINK_LEN */
-const BLINK = 5.3;
-const BLINK_LEN = 0.36;
 /** weight of the centre-first bias in the arrival order (0 = purely random) */
 const BIAS = 0.25;
 /** ghost of the picture to come: its outline (uniform small squares) and its body */
 const GHOST_EDGE = 0.5;
 const GHOST_BODY = 0.12;
+/** colourfulness ramps over this span of growth (milestone 1 → frontier), eased in */
+const COLOR_FROM = 0.1;
+const COLOR_TO = 0.96;
+/** how much a fold lights up as one piece (vs cell by cell) */
+const COLOR_GROUP = 0.6;
+/** number of vivid colour slots used (VIVID in color.ts) */
+const SLOTS = VIVID.length;
 
 // ── brain shape, in brain space (|n| ≈ 1 at the rim; y scaled by ASPECT) ──
 const SIZE = 0.37; // half-width as a fraction of the box width
@@ -80,31 +89,6 @@ const FISSURE = 0.6;
 const WAVES = 11;
 const WAVE_K = 0.66;
 const WAVE_SEED = 13;
-
-// ── the face: '#' plate (accent), '@' features (ink); square cells
-const FACE_LG = [
-  '....#####....',
-  '..#########..',
-  '.###########.',
-  '###@@###@@###',
-  '###@@###@@###',
-  '###@@###@@###',
-  '#############',
-  '####@###@####',
-  '.####@@@####.',
-  '..#########..',
-  '....#####....',
-];
-const FACE_SM = [
-  '...#####...',
-  '.#########.',
-  '##@@###@@##',
-  '##@@###@@##',
-  '###########',
-  '###@###@###',
-  '.###@@@###.',
-  '...#####...',
-];
 
 type Brain = {
   key: string;
@@ -126,10 +110,11 @@ type Brain = {
   gw: number;
   gh: number;
   grid: Uint8Array;
-  /** face centre offset and sprite */
-  fx: number;
-  fy: number;
-  face: string[];
+  /** per grid cell: vivid colour slot (0 = stays ink: the rim) and the colourfulness at which it lights up */
+  slot: Uint8Array;
+  hue: Float32Array;
+  /** per particle: its grid cell */
+  cell: Int32Array;
   /** the brain sits this many cells above the box centre (clears the DOM chart) */
   lift: number;
   /** box half extents, cells */
@@ -219,6 +204,8 @@ function build(box: Box, mobile: boolean, key: string): Brain {
     }
   }
 
+  const { slot, hue } = colourFolds(grid, rims, inside, gw, gh);
+
   // particles, one per inked target cell; arrival order mostly random (so the
   // whole picture sharpens at once, like a photo gaining pixels) with a mild
   // centre-first bias, so the seed sits in the middle
@@ -238,6 +225,7 @@ function build(box: Box, mobile: boolean, key: string): Brain {
   const edge = new Uint8Array(n);
   const sx = new Float32Array(n);
   const sy = new Float32Array(n);
+  const cell = new Int32Array(n);
   const seedN = Math.round(n * SEED);
   for (let rank = 0; rank < n; rank++) {
     const idx = cells[order[rank]];
@@ -248,6 +236,7 @@ function build(box: Box, mobile: boolean, key: string): Brain {
     tx[rank] = dx;
     ty[rank] = dy;
     edge[rank] = rims[idx];
+    cell[rank] = idx;
     // seed pixels are there from the start; the rest arrive evenly over A
     k[rank] =
       rank < seedN ? (rank / seedN) * SEED : SEED + FLIGHT + ((rank - seedN) / Math.max(1, n - seedN)) * (1 - SEED - FLIGHT);
@@ -260,42 +249,125 @@ function build(box: Box, mobile: boolean, key: string): Brain {
     sy[rank] = s * D;
   }
 
-  // the face sits on the lower left of the left lobe
-  const face = mobile ? FACE_SM : FACE_LG;
-  const fx = Math.round(-0.46 * a);
-  const fy = Math.round(0.4 * b);
-  return { key, a, b, n, tx, ty, k, edge, sx, sy, gx, gy, gw, gh, grid, fx, fy, face, lift, hw, hh };
+  return { key, a, b, n, tx, ty, k, edge, sx, sy, gx, gy, gw, gh, grid, slot, hue, cell, lift, hw, hh };
 }
 
-/** max-blend one cell */
-function put(r: Raster, x: number, y: number, val: number, acc: boolean) {
+/**
+ * Give every fold its colour. Folds are the 4-connected patches of inked,
+ * non-rim cells (grooves separate them). Greedy colouring keeps folds that
+ * face each other across a groove in different colours. Each cell's `hue` is
+ * the colourfulness at which it lights up: mostly its fold's (so folds light
+ * up as pieces), partly its own (a ragged pixel front inside the fold).
+ */
+function colourFolds(grid: Uint8Array, rims: Uint8Array, inside: Uint8Array, gw: number, gh: number) {
+  const N = gw * gh;
+  const label = new Int32Array(N).fill(-1);
+  const queue = new Int32Array(N);
+  let folds = 0;
+  for (let s0 = 0; s0 < N; s0++) {
+    if (!grid[s0] || rims[s0] || label[s0] >= 0) continue;
+    let head = 0;
+    let tail = 0;
+    queue[tail++] = s0;
+    label[s0] = folds;
+    while (head < tail) {
+      const c = queue[head++];
+      const i = c % gw;
+      const nb = [i > 0 ? c - 1 : -1, i < gw - 1 ? c + 1 : -1, c - gw, c + gw];
+      for (const d of nb) {
+        if (d < 0 || d >= N || !grid[d] || rims[d] || label[d] >= 0) continue;
+        label[d] = folds;
+        queue[tail++] = d;
+      }
+    }
+    folds++;
+  }
+  // folds that meet across a groove cell are neighbours
+  const near: Set<number>[] = Array.from({ length: folds }, () => new Set<number>());
+  for (let c = 0; c < N; c++) {
+    if (!inside[c] || grid[c]) continue;
+    const i = c % gw;
+    const ids: number[] = [];
+    for (let dj = -1; dj <= 1; dj++) {
+      for (let di = -1; di <= 1; di++) {
+        const ii = i + di;
+        const d = c + dj * gw + di;
+        if (ii < 0 || ii >= gw || d < 0 || d >= N || label[d] < 0) continue;
+        if (!ids.includes(label[d])) ids.push(label[d]);
+      }
+    }
+    for (const x of ids) for (const y of ids) if (x !== y) near[x].add(y);
+  }
+  const colour = new Int8Array(folds).fill(-1);
+  for (let f = 0; f < folds; f++) {
+    const start = Math.floor(hash2(f, 1, 71) * SLOTS);
+    let pick = start;
+    for (let o = 0; o < SLOTS; o++) {
+      const c = (start + o) % SLOTS;
+      let clash = false;
+      for (const g of near[f]) if (colour[g] === c) clash = true;
+      if (!clash) {
+        pick = c;
+        break;
+      }
+    }
+    colour[f] = pick;
+  }
+  const slot = new Uint8Array(N);
+  const hue = new Float32Array(N);
+  for (let c = 0; c < N; c++) {
+    const f = label[c];
+    if (f < 0) continue;
+    slot[c] = colour[f] + 1;
+    hue[c] = COLOR_GROUP * hash2(f, 2, 73) + (1 - COLOR_GROUP) * hash2(c % gw, (c / gw) | 0, 79);
+  }
+  return { slot, hue };
+}
+
+/** colourfulness 0..1 at growth g: plain ink at the first milestone, a full colour map at the frontier */
+const colourful = (g: number) => smoothstep(COLOR_FROM, COLOR_TO, g) ** 1.25;
+
+/** max-blend one cell; an ink write with a colour slot also tags the cell's colour */
+function put(r: Raster, x: number, y: number, val: number, acc: boolean, slot = 0) {
   if (val <= 0.01 || x < 0 || y < 0 || x >= r.w || y >= r.h) return;
   const i = y * r.w + x;
   const ch = acc ? r.acc : r.ink;
-  if (val > ch[i]) ch[i] = val > 1 ? 1 : val;
+  if (val > ch[i]) {
+    ch[i] = val > 1 ? 1 : val;
+    if (!acc) r.col[i] = slot;
+  }
 }
 
 /** overwrite one cell (things drawn on top of the brain) */
-function over(r: Raster, x: number, y: number, ink: number, acc: number) {
+function over(r: Raster, x: number, y: number, ink: number, acc: number, slot = 0) {
   if (x < 0 || y < 0 || x >= r.w || y >= r.h) return;
   const i = y * r.w + x;
   r.ink[i] = ink;
   r.acc[i] = acc;
+  r.col[i] = slot;
 }
 
-/** A flying pixel: a head at (hx, hy) and a fading accent streak back toward (bx, by). */
-function streak(r: Raster, hx: number, hy: number, bx: number, by: number, alpha: number, solidHead: boolean) {
+/**
+ * A flying pixel: a head at (hx, hy) and a fading streak back toward (bx, by),
+ * in paper-white accent — or, with a colour slot, in that vivid colour.
+ */
+function streak(r: Raster, hx: number, hy: number, bx: number, by: number, alpha: number, solidHead: boolean, slot = 0) {
   const dx = bx - hx;
   const dy = by - hy;
   const d = Math.hypot(dx, dy);
   const len = Math.min(STREAK, d);
+  const acc = slot === 0;
   for (let s = 1; s <= len; s++) {
     const fall = 1 - (s - 1) / STREAK;
-    put(r, Math.round(hx + (dx / d) * s), Math.round(hy + (dy / d) * s), alpha * (0.3 + 0.5 * fall), true);
+    put(r, Math.round(hx + (dx / d) * s), Math.round(hy + (dy / d) * s), alpha * (0.3 + 0.5 * fall), acc, slot);
   }
   // the head shows even over landed ink, so the pixel visibly reaches its cell
-  if (solidHead) over(r, Math.round(hx), Math.round(hy), 0, alpha);
-  else put(r, Math.round(hx), Math.round(hy), alpha, true);
+  const x = Math.round(hx);
+  const y = Math.round(hy);
+  if (solidHead) {
+    if (acc) over(r, x, y, 0, alpha);
+    else over(r, x, y, alpha, 0, slot);
+  } else put(r, x, y, alpha, acc, slot);
 }
 
 const scene: Scene = {
@@ -311,12 +383,13 @@ const scene: Scene = {
     const g = growth(p);
     // arrival front: SEED → 1 (+ the last glint) over the growth
     const A = SEED + (1 + GLINT - SEED) * clamp(g / 0.97);
+    // colour: how far the brain has lit up (cells with hue < C are in colour)
+    const C = colourful(g);
 
     // ending beats
     const drift = easeInOut(range(copyOut + 0.005, questionStart + 0.06, p));
     const erode = easeInOut(range(questionStart - 0.01, questionEnd - 0.03, p));
     const fade = 1 - range(chartZoom, chartZoomEnd, p);
-    const faceGone = range(copyOut, questionStart + 0.02, p);
 
     const cx = Math.round(lerp(box.cx, full.cx, drift));
     const cy = Math.round(lerp(box.cy - B.lift, full.cy, drift));
@@ -338,24 +411,25 @@ const scene: Scene = {
         if (j < 0 || j >= B.gh) continue;
         for (let x = x0; x < x1; x++) {
           const i = Math.round((x - cx) / sc) - B.gx;
-          if (i < 0 || i >= B.gw || !B.grid[j * B.gw + i]) continue;
+          const gi = j * B.gw + i;
+          if (i < 0 || i >= B.gw || !B.grid[gi]) continue;
           if (hash2(i, j, 41) < gone) continue;
           const step = Math.floor(erode * 3.9 - hash2(i, j, 43) * 0.9);
-          put(r, x, y, step <= 0 ? 1 : step === 1 ? 0.75 : step === 2 ? 0.5 : 0.25, false);
+          put(r, x, y, step <= 0 ? 1 : step === 1 ? 0.75 : step === 2 ? 0.5 : 0.25, false, B.hue[gi] < C ? B.slot[gi] : 0);
         }
       }
     } else {
       // a ghost of the picture to come (a fine-dot outline over a faint
       // body); landed pixels glint, then ink
       const ghost = 1 - smoothstep(0.3, 0.85, g);
-      const { n, tx, ty, k, edge, sx, sy } = B;
+      const { n, tx, ty, k, edge, sx, sy, slot, hue, cell } = B;
       for (let q = 0; q < n; q++) {
         const kq = k[q];
         const x = cx + tx[q];
         const y = cy + ty[q];
         if (A >= kq) {
           if (kq >= SEED && A - kq < GLINT) put(r, x, y, 1, true);
-          else put(r, x, y, 1, false);
+          else put(r, x, y, 1, false, hue[cell[q]] < C ? slot[cell[q]] : 0);
         } else if (ghost > 0) {
           put(r, x, y, (edge[q] ? GHOST_EDGE : GHOST_BODY) * ghost, false);
         }
@@ -375,6 +449,7 @@ const scene: Scene = {
           cy + lerp(sy[q], ty[q], eb),
           0.45 + 0.55 * smoothstep(0, 0.18, f),
           true,
+          hue[cell[q]] < C ? slot[cell[q]] : 0,
         );
       }
     }
@@ -395,59 +470,11 @@ const scene: Scene = {
         const d = lerp(D, rim, ph * ph);
         const d0 = lerp(D, rim, Math.max(0, ph - 0.14) ** 2);
         const al = 0.55 * trickle * smoothstep(0, 0.15, ph) * (1 - smoothstep(0.85, 1, ph));
-        streak(r, cx + c * d, cy + s * d, cx + c * d0, cy + s * d0, al, false);
+        const tint = hash2(m, 9, 61) < C ? 1 + (m % SLOTS) : 0;
+        streak(r, cx + c * d, cy + s * d, cx + c * d0, cy + s * d0, al, false, tint);
       }
     }
 
-    // ── the face: opens once the brain is fairly clear, closes as it leaves
-    const pop = range(0.55, 0.68, g) * (1 - easeInOut(faceGone));
-    if (pop > 0) {
-      const rows = B.face;
-      const fh = rows.length;
-      const fw = rows[0].length;
-      const ox = cx + B.fx - (fw >> 1);
-      const oy = cy + B.fy - (fh >> 1);
-      const reach = pop * 1.15 * Math.hypot(fw / 2, fh / 2);
-      // a slow, soft blink: every BLINK s the eyes close row by row from the
-      // top down to their bottom row, then reopen the same way
-      const bp = t > 0 ? (t % BLINK) - (BLINK - BLINK_LEN) : -1;
-      const shut = bp > 0 ? 1 - Math.abs((2 * bp) / BLINK_LEN - 1) : 0;
-      // the face opens from its middle, features and all: the eyes first, the
-      // smile as it reaches the bottom (and the reverse when it closes)
-      const shown = (i: number, j: number) =>
-        j >= 0 &&
-        j < fh &&
-        i >= 0 &&
-        i < fw &&
-        rows[j].charCodeAt(i) !== 46 && // '.'
-        Math.hypot(i + 0.5 - fw / 2, j + 0.5 - fh / 2) <= reach;
-      const feature = (i: number, j: number) => j >= 0 && j < fh && rows[j].charCodeAt(i) === 64; // '@'
-      for (let j = -1; j <= fh; j++) {
-        for (let i = -1; i <= fw; i++) {
-          const x = ox + i;
-          const y = oy + j;
-          if (!shown(i, j)) {
-            // a crisp ink outline around the visible plate
-            if (shown(i - 1, j) || shown(i + 1, j) || shown(i, j - 1) || shown(i, j + 1)) over(r, x, y, 1, 0);
-            continue;
-          }
-          if (feature(i, j)) {
-            // eyes (upper half): hide their top rows while blinking
-            let above = 0;
-            let below = 0;
-            if (j < fh / 2) {
-              while (feature(i, j - 1 - above)) above++;
-              while (feature(i, j + 1 + below)) below++;
-            }
-            if (j >= fh / 2 || above >= Math.round(shut * (above + below))) {
-              over(r, x, y, 1, 0);
-              continue;
-            }
-          }
-          over(r, x, y, 0, 1);
-        }
-      }
-    }
   },
 };
 

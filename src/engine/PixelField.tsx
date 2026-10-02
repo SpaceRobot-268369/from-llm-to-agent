@@ -13,20 +13,18 @@
  * headline card is up).
  */
 import { useEffect, useRef } from 'react';
-import { css } from './color';
+import { css, VIVID } from './color';
 import { heroHole } from './layout';
-import { drawHalftone, MARK } from './halftone';
+import { drawHalftone, MARK, TONE_ACC, TONE_INK, TONE_VIVID } from './halftone';
 import { chapterOf, type Section } from '../content/sections';
 import type { Box } from './scenes/types';
-import { hash2 } from './noise';
+import { hash2, smoothstep } from './noise';
 import { Raster } from './raster';
 import { SCENES } from './scenes';
 import { artRect, BASE_CELL_DESKTOP, BASE_CELL_MOBILE, grid, toGrid } from './layout';
 import { placement } from './phases';
 import { ticker, type Frame } from './ticker';
-
-/** width of the dissolve front, in noise units */
-const EDGE = 0.28;
+import { EDGE, wipeFront } from './wipe';
 /** soft, slow halo around the mouse — kept subtle so it never competes with reading */
 const POINTER_RADIUS = 90; // CSS px
 const POINTER_RATE = 3; // re-rolls per second
@@ -37,6 +35,15 @@ const CLIP_MARGIN = 1;
 function markOf(s: Section): number {
   return MARK[chapterOf(s)?.mark ?? 'square'];
 }
+
+/** a cell's halftone tone: accent if it wins, else ink — in its vivid colour when tagged (Raster.col) */
+function toneOf(ink: number, acc: number, col: number): number {
+  if (acc > ink) return TONE_ACC;
+  return col && ink > 0 ? TONE_VIVID + col - 1 : TONE_INK;
+}
+
+/** css colours per halftone tone: [ink, accent, ...VIVID]; the first two follow the palette each frame */
+const TONE_COLORS: string[] = ['', '', ...VIVID];
 
 /** Clip a raster to a box (+margin) in place. */
 function clip(r: Raster, b: Box) {
@@ -51,6 +58,7 @@ function clip(r: Raster, b: Box) {
       if (inY && x >= x0 && x < x1) continue;
       r.ink[row + x] = 0;
       r.acc[row + x] = 0;
+      r.col[row + x] = 0;
     }
   }
 }
@@ -76,7 +84,7 @@ export function PixelField() {
     const A = new Raster();
     const B = new Raster();
     let values = new Float32Array(0);
-    let accent = new Uint8Array(0);
+    let tones = new Uint8Array(0);
     let marks = new Uint8Array(0);
     // draw at the canvas's own CSS size — innerWidth includes a classic
     // scrollbar, which would make the browser resample (blur) the squares
@@ -114,7 +122,7 @@ export function PixelField() {
       const n = cols * rows;
       if (values.length !== n) {
         values = new Float32Array(n);
-        accent = new Uint8Array(n);
+        tones = new Uint8Array(n);
         marks = new Uint8Array(n);
       }
 
@@ -133,8 +141,12 @@ export function PixelField() {
           if (!sb!.unclipped?.(pb!.sp)) clip(B, boxB);
         }
       }
-      const la = pa.light;
+      // the incoming section opens on its headline (no diagram yet): clear the
+      // outgoing diagram before that headline rises into view (~blend 0.5), so
+      // dissolve / wipe leftovers never sit behind its text
       const lb = pb ? pb.light : 1;
+      const clearOut = blending && lb < 0.01 ? 1 - smoothstep(0.28, 0.5, f.blend) : 1;
+      const la = pa.light * clearOut;
       const markA = markOf(pa.sec);
       const markB = pb ? markOf(pb.sec) : markA;
       // a chapter change wipes left → right; a topic change dissolves in blocks
@@ -159,7 +171,7 @@ export function PixelField() {
           const ai = A.ink[i];
           const aa = A.acc[i];
           let v = (ai > aa ? ai : aa) * la;
-          let acc = aa > ai;
+          let tone = toneOf(ai, aa, A.col[i]);
           let mark = markA;
           if (blending) {
             const nz = wipe
@@ -173,7 +185,7 @@ export function PixelField() {
               const vb = (bi > ba ? bi : ba) * lb;
               v = v * (1 - w) + vb * w;
               if (w > 0.5) {
-                acc = ba > bi;
+                tone = toneOf(bi, ba, B.col[i]);
                 mark = markB;
               }
             }
@@ -184,7 +196,7 @@ export function PixelField() {
             const d = hash2(x, y, 131 + dustTick) > 0.4 ? 0.3 : 0.12;
             if (d > v) {
               v = d;
-              acc = false;
+              tone = TONE_INK;
             }
           }
           if (usePtr) {
@@ -197,7 +209,7 @@ export function PixelField() {
             }
           }
           values[i] = v;
-          accent[i] = acc ? 1 : 0;
+          tones[i] = tone;
           marks[i] = mark;
         }
       }
@@ -206,25 +218,26 @@ export function PixelField() {
         // the new chapter's colour sweeps in behind the wipe front
         ctx.fillStyle = pa.sec.palette.bg;
         ctx.fillRect(0, 0, cw, ch);
-        const front = Math.max(0, Math.min(1, (k - EDGE / 2 - 0.09) / 0.82));
+        const front = wipeFront(f.blend);
         ctx.fillStyle = pb!.sec.palette.bg;
         ctx.fillRect(0, 0, Math.round(front * cw), ch);
       } else {
         ctx.fillStyle = css(f.colors.bg);
         ctx.fillRect(0, 0, cw, ch);
       }
+      TONE_COLORS[TONE_INK] = css(f.colors.px);
+      TONE_COLORS[TONE_ACC] = css(f.colors.accent);
       drawHalftone({
         ctx,
         values,
-        accent,
+        tones,
         marks,
         w: cols,
         h: rows,
         cell: cell * dpr,
         offX: offX * dpr,
         offY: offY * dpr,
-        inkColor: css(f.colors.px),
-        accColor: css(f.colors.accent),
+        colors: TONE_COLORS,
       });
     };
 

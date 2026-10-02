@@ -1,5 +1,17 @@
 export type RGB = [number, number, number];
 
+/**
+ * The fixed vivid palette behind the Raster's `col` channel (slot k = VIVID[k - 1]).
+ * Not tied to a section palette: it is for the few places where colour itself
+ * is the meaning (the scaling brain lighting up). Saturated mid-dark hues
+ * (blue, violet, magenta, crimson, burnt orange): each ≥ 2.1:1 against the
+ * scaling green #5DCB8A, ≥ 3.4:1 against the paper backgrounds and ≥ 3:1
+ * against the dark ink, so a coloured cell never reads as ink. Bright yellow
+ * and orange are left out (≤ 1.6:1 on that green), and so is teal (too close
+ * to the green's hue).
+ */
+export const VIVID = ['#2448F0', '#7A2CF0', '#C8157F', '#D61A3C', '#D9480F'] as const;
+
 export function hex(h: string): RGB {
   const s = h.replace('#', '');
   const n = parseInt(s.length === 3 ? s.replace(/(.)/g, '$1$1') : s, 16);
