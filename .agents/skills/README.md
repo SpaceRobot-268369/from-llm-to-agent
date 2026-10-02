@@ -7,7 +7,7 @@ capabilities** that adapt their approach to the task.
 Each skill follows the open Agent Skills format: it lives in its own folder
 with a required `SKILL.md` containing `name` and trigger-focused `description`
 frontmatter. Supporting templates or helpers stay beside it, for example
-`draft-pr/SKILL.md` plus `draft-pr/template.md`.
+`<skill>/SKILL.md` plus a `<skill>/template.md` it fills in.
 
 Deterministic skills declare their low-freedom execution style in the body and
 retain every approval gate. Do not create a parallel `commands/` taxonomy.

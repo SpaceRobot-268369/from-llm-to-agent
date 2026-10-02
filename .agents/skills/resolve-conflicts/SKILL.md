@@ -1,6 +1,6 @@
 ---
 name: resolve-conflicts
-description: Diagnose, group, resolve, and verify Git conflicts from merges, rebases, cherry-picks, or stash operations without committing. Use when an operation hits conflicts or the user asks to resolve or fix a merge conflict.
+description: Diagnose, group, resolve, and verify Git conflicts from stash pops, pulls, merges, rebases, reverts, or cherry-picks without committing. Use when an operation hits conflicts or the user asks to resolve or fix a merge conflict.
 ---
 
 # Skill: resolve-conflicts
@@ -9,9 +9,14 @@ Turn a wall of conflict markers into a **grouped, reasoned report**, then
 resolve safely. The flow is always: diagnose → report → resolve → verify →
 hand back.
 
-This skill resolves and stages conflicts. Continuing a merge, rebase, or
-cherry-pick may create commits, so that step needs its own explicit approval.
-It never pushes.
+All work happens on `main` (Principle 6), so conflicts are rare. They mostly
+come from `git stash pop`, a `git pull` once a remote exists, or a revert or
+cherry-pick: committed `main` (HEAD) on one side, the incoming change on the
+other.
+
+This skill resolves and stages conflicts. Continuing a merge, rebase, revert,
+or cherry-pick may create commits, so that step needs its own explicit
+approval. It never pushes.
 
 ## Prerequisites
 
@@ -22,8 +27,8 @@ It never pushes.
 ## Hard guardrails
 
 - **Report before touching anything.**
-- **Default side = `main`** for non-trivial conflicts the developer hasn't
-  weighed in on — but surface the choice and ask first.
+- **Default side = committed `main` (HEAD)** for non-trivial conflicts the
+  developer hasn't weighed in on — but surface the choice and ask first.
 - **Never** resolve a whole file with `--ours`/`--theirs` without
   understanding both sides.
 - **Never** `--abort` without explicit confirmation. Never `--no-verify`,
@@ -35,28 +40,29 @@ It never pushes.
 
 ## Pipeline
 
-1. **Detect context:** `git status`; which operation is in flight; which side
-   is "ours".
+1. **Detect context:** `git status`; which operation is in flight (stash pop,
+   pull, merge, rebase, revert, cherry-pick); which side is "ours".
 2. **Inventory:** `git diff --name-only --diff-filter=U` and the conflict
    types.
 3. **Diagnose** each file: what each side intended, the cost of keeping
-   `main`, and the cost of keeping the branch. Project special cases:
+   `main`, and the cost of keeping the incoming change. Project special cases:
    - `src/content/sections.ts` — section order must match
      `content-outline.md`. Merge both sides' sections in build order; the
      code numbers topics itself, so renumber only the outline and
      `references.md` by hand.
    - `src/engine/scenes/index.ts` — registry: keep the union.
-   - `package-lock.json` — don't hand-merge. Take `main`'s version, then run
-     `npm install`.
+   - `package-lock.json` — don't hand-merge. Take committed `main`'s
+     version, then run `npm install`.
 4. **Group** files that conflict for the same reason; tag each group
    *trivial* or *complex*.
 5. **Present** a table: group · files · conflicting changes · if keep main ·
-   if keep branch · recommendation · class.
+   if keep incoming · recommendation · class.
 6. **Resolve:** auto-apply trivial groups; apply complex groups only as
    confirmed.
 7. **Verify:** `git diff --check`; no conflict markers left; then
    `npm run typecheck && npm run build`.
 8. **Stage and stop.** Show the staged paths, the check results, and the exact
    continuation command (`git merge --continue` / `git rebase --continue` /
-   `git cherry-pick --continue`). Run it only after explicit approval, then
-   report the resulting commit hashes.
+   `git revert --continue` / `git cherry-pick --continue`; after a conflicted
+   `git stash pop` the stash is kept, so offer `git stash drop`). Run it only
+   after explicit approval, then report the resulting commit hashes.

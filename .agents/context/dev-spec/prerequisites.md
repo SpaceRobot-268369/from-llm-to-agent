@@ -21,23 +21,14 @@ Used by every frontend task (`start-local-dev`, `capture-ui`, builds).
 
 ## Git
 
-Used by `commit`, `new-branch`, `draft-pr`, `open-pr`, `resolve-conflicts`.
+Used by `commit` and `resolve-conflicts`.
 
 - **Check:** `git --version`, and `git rev-parse --is-inside-work-tree` prints
   `true`.
 - **Set up:** if the project is not a repository yet, ask the developer before
-  running `git init` and before the first commit (the only commit allowed
-  directly on `main`, per Principle 6). Worktrees are not used in this
-  project.
-
-## GitHub CLI (`gh`)
-
-Used by `draft-pr` and `open-pr`.
-
-- **Check:** `gh auth status` (authenticated) and an `origin` remote
-  (`git remote -v`).
-- **Set up:** `brew install gh`, then `gh auth login`. Adding a remote is a
-  developer decision; ask first.
+  running `git init`. All work is committed directly on `main`; branches and
+  worktrees are not used (Principle 6). Adding a remote is a developer
+  decision; ask first.
 
 ## Browser / preview tooling
 

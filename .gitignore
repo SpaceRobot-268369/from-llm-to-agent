@@ -15,8 +15,8 @@ dist/
 # provider-local settings
 .claude/settings.local.json
 
-# screenshots for PRs
-.pr-screenshots/
+# screenshots from capture-ui
+.screenshots/
 
 # OS / editor cruft
 .DS_Store

@@ -1,66 +1,58 @@
-# Git Workflow & Branch Naming
+# Git Workflow
 
-## One workflow: single checkout, branches only
+## One branch, one checkout
 
-This project uses **one checkout that switches branches**. **Do not create Git
-worktrees** (Principle 6). If a task seems to need parallel checkouts, finish
-or commit the current work first, then switch branches.
+All work happens directly on **`main`** in this one checkout (Principle 6).
+There are no feature branches, no pull requests, and **no Git worktrees**. If
+a task seems to need a parallel checkout, finish or commit the current work
+first, then start the next one.
 
-> The repository is initialised: `main` holds the initial scaffold commit,
-> the one commit made directly on `main` (with explicit approval). Every later
-> change goes on a branch.
+Commits still matter: they are the project's history and its undo button.
+Keep each one small and about one thing.
 
-## Branch syntax
+## Commit messages
 
-```
-scope_name/branch_type/author/feature_name
-```
+[Conventional Commits](https://www.conventionalcommits.org/):
+`<type>(<scope>): <subject>`, with an imperative, lowercase subject and no
+trailing period. The full format lives in the
+[`commit`](../../skills/commit/SKILL.md) skill.
 
-- **scope_name:**
-  - `page` — section copy, section layout, HUD, and React components under
-    `src/components/` and `src/content/`.
-  - `engine` — the Pixel Field, scenes, scroll ticker, and palette logic under
-    `src/engine/`.
-  - `universal` — repo-wide work: tooling, config, dependencies, docs, and
-    agent files.
-- **branch_type:** `feature`, `bugfix`, `hotfix`, `refactor`, `test`, `docs`,
-  `chore`, `release`, `beautify`, `init`, `review` (see the table below).
-- **author:** your name (default `Lucas`).
-- **feature_name:** short kebab-case description of the work.
+- **type:** `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `perf`,
+  `style`, `build`, `ci`.
+- **scope** (optional; leave it off for repo-wide changes):
 
-Examples: `page/feature/Lucas/rag-section`,
-`engine/beautify/Lucas/dissolve-easing`, `universal/docs/Lucas/agent-files`.
+| Scope | Covers |
+|-------|--------|
+| `content` | Page copy, chapters, palettes and labels in `src/content/`. |
+| `sections` | Section layouts under `src/components/` (hero, chapter card, finale). |
+| `hud` | Top bar, progress rail, stack trail. |
+| `styles` | Global CSS in `src/styles/`. |
+| `engine` | Pixel Field, ticker, phases, halftone and palette logic in `src/engine/`. |
+| `scene-<id>` | One scene, e.g. `scene-rag`. |
+| `tooling` | Dependencies, config, build. |
+| `agent-files` | `AGENTS.md`, `CLAUDE.md`, `.agents/`, `.claude/launch.json`. |
+| `docs` | `README.md` and other human-facing docs. |
 
-## Branch types
+Examples: `feat(scene-rag): add the retrieval shelf`,
+`fix(engine): stop the chapter wipe flickering on resize`,
+`docs(agent-files): work directly on main`.
 
-| branch_type | Use it for |
-|-------------|------------|
-| `feature`   | New user-facing content or capability (a new section, a new scene). |
-| `bugfix`    | Fixing a defect through the normal review cycle. |
-| `hotfix`    | Urgent fix to a live deployment. |
-| `refactor`  | Restructuring code without changing what the page shows. |
-| `test`      | Adding or improving tests only. |
-| `docs`      | Documentation-only changes — README, dev-spec, agent files, comments. |
-| `chore`     | Maintenance — dependencies, config, build, CI, tooling. |
-| `release`   | Release preparation — version bumps, changelog, tagging. |
-| `beautify`  | Purely visual polish (palette, spacing, easing) with no story change. |
-| `init`      | Initial scaffolding. |
-| `review`    | Reviewing another author's branch/PR and adjusting where needed. |
+## The commit loop
 
-## Workflow
+1. Make one logical change on `main`.
+2. Verify: `npm run typecheck`, `npm run build`, and a visual check via
+   [`capture-ui`](../../skills/capture-ui/SKILL.md) when the page changed.
+3. Commit through the [`commit`](../../skills/commit/SKILL.md) skill. It shows
+   the staged files and the message, and **commits only after explicit
+   approval** (Principle 5).
 
-1. Start from the latest `main`:
-   `git checkout main && git fetch origin && git pull --ff-only origin main`
-   (skip fetch/pull if there is no remote yet).
-2. Create your branch with the [`new-branch`](../../skills/new-branch/SKILL.md)
-   skill. Do not commit directly to `main`.
-3. Develop and verify locally (`npm run typecheck`, `npm run build`, visual
-   check via [`capture-ui`](../../skills/capture-ui/SKILL.md)). Create each
-   commit through the approval-gated [`commit`](../../skills/commit/SKILL.md)
-   skill.
-4. Before merging, fetch `origin/main`, preflight the update, and synchronize
-   only with approval. Resolve conflicts with
-   [`resolve-conflicts`](../../skills/resolve-conflicts/SKILL.md). **Never
-   `--force`** onto shared history.
-5. Open a pull request ([`draft-pr`](../../skills/draft-pr/SKILL.md) →
-   [`open-pr`](../../skills/open-pr/SKILL.md)) and wait for review.
+## Remote and pushing
+
+There is no remote yet. Adding one, and every push, needs explicit approval
+(Principles 3 and 5). **Never `--force`**, never rewrite history.
+
+## Conflicts
+
+Rare on a single branch. They mostly come from `git stash pop`, a future
+`git pull` once a remote exists, or a revert or cherry-pick. Resolve them with
+[`resolve-conflicts`](../../skills/resolve-conflicts/SKILL.md).

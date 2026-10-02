@@ -21,11 +21,9 @@ action.
 > [`../../context/dev-spec/prerequisites.md`](../../context/dev-spec/prerequisites.md),
 > then stop.
 
-> If the current branch is `main`, stop and offer
-> [`new-branch`](../new-branch/SKILL.md) first. The only commit allowed
-> directly on `main` is the initial scaffold commit of a freshly initialised
-> repository, with explicit approval (Principle 6). `new-branch` carries
-> uncommitted work onto the new branch, so you can commit there.
+> Commits go directly on `main` (Principle 6). If HEAD is detached or another
+> branch is checked out (`git branch --show-current` is not `main`), stop and
+> ask the developer.
 
 ## Steps
 
@@ -37,7 +35,7 @@ action.
 3. **Decide on untracked files (judgment):**
    - **Do NOT commit** (add to `.gitignore` instead): per-user/local config,
      env files, build output (`dist/`), caches, `node_modules/`,
-     `.pr-screenshots/`, local memory under `.agents/memory/local/` (except its
+     `.screenshots/`, local memory under `.agents/memory/local/` (except its
      `README.md`), and OS cruft (`.DS_Store`).
    - **Commit:** source, docs, agent files, shared config.
    - **When unsure**, ask.
@@ -58,7 +56,8 @@ action.
 - **type:** `feat`, `fix`, `docs`, `refactor`, `chore`, `test`, `perf`,
   `style`, `build`, `ci`.
 - **scope:** optional, for example `engine`, `scene-rag`, `content`, `hud`,
-  `agent-files`.
+  `agent-files` (full list in
+  [`git-workflow.md`](../../context/dev-spec/git-workflow.md#commit-messages)).
 - **subject:** imperative, lowercase, no trailing period.
 - **co-author trailer:** attribute the agent that actually made the commit
   when its standard identity is known. Never guess or invent one.

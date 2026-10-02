@@ -36,13 +36,12 @@
 5. **Never rewrite shared history.** Never `--force` push or rewrite shared Git
    history. Never commit or push without explicit user approval.
 
-6. **Single checkout, no worktrees.** This project does not use Git worktrees.
-   Work happens in one checkout on a convention-named branch (see
-   [`git-workflow.md`](.agents/context/dev-spec/git-workflow.md)); don't
-   commit directly to `main` — the one exception is the initial scaffold
-   commit of a freshly initialised repository, with explicit approval. Never
-   run `git worktree add`. If the folder is not a Git repository yet, ask
-   before running `git init`.
+6. **Single checkout on `main`, no branches, no worktrees.** All work happens
+   directly on `main` in one checkout: no feature branches, no pull requests,
+   and never `git worktree add`. Commits still matter: small, logical, and
+   each made only with explicit approval (see
+   [`git-workflow.md`](.agents/context/dev-spec/git-workflow.md)). If the
+   folder is not a Git repository yet, ask before running `git init`.
 
 7. **The story is designed before it is built.** Page copy changes start in
    [`content-outline.md`](.agents/context/products/content-outline.md), then
@@ -98,7 +97,7 @@ full-screen chapter card:
 | Topic | File |
 |-------|------|
 | Conventions and architecture | [`.agents/context/dev-spec/conventions.md`](.agents/context/dev-spec/conventions.md) |
-| Git workflow and branch naming (no worktrees) | [`.agents/context/dev-spec/git-workflow.md`](.agents/context/dev-spec/git-workflow.md) |
+| Git workflow (main only, commits, no worktrees) | [`.agents/context/dev-spec/git-workflow.md`](.agents/context/dev-spec/git-workflow.md) |
 | Prerequisites and setup | [`.agents/context/dev-spec/prerequisites.md`](.agents/context/dev-spec/prerequisites.md) |
 
 ## Product Context
@@ -121,10 +120,7 @@ same approved change whenever a skill is added, removed, or renamed.
 | [`fact-check`](.agents/skills/fact-check/SKILL.md) | Audit page copy for unsourced, overstated, or outdated claims. |
 | [`capture-ui`](.agents/skills/capture-ui/SKILL.md) | Screenshot affected sections at desktop and mobile sizes. |
 | [`called-out-dev-panel`](.agents/skills/called-out-dev-panel/SKILL.md) | Scaffold a dev-only panel to live-tune Pixel Field, scene, or palette parameters. |
-| [`commit`](.agents/skills/commit/SKILL.md) | Stage and commit current changes after explicit approval. |
-| [`new-branch`](.agents/skills/new-branch/SKILL.md) | Commit approved work, sync `main`, and create a confirmed convention-named branch. |
-| [`draft-pr`](.agents/skills/draft-pr/SKILL.md) | Draft a PR and, after approval, push and create it as a draft. |
-| [`open-pr`](.agents/skills/open-pr/SKILL.md) | Promote or create a ready-for-review PR, subject to approval. |
+| [`commit`](.agents/skills/commit/SKILL.md) | Stage and commit current changes on `main` after explicit approval. |
 | [`resolve-conflicts`](.agents/skills/resolve-conflicts/SKILL.md) | Diagnose, group, resolve, and verify Git conflicts without committing. |
 | [`grill-me`](.agents/skills/grill-me/SKILL.md) | Stress-test a plan through focused, dependency-aware questions. |
 

@@ -1,20 +1,20 @@
 ---
 name: capture-ui
-description: Capture screenshots of affected sections of the page at desktop and mobile sizes for review or visual verification. Use when a PR touches the page or the user asks to see the current UI.
+description: Capture screenshots of affected sections of the page at desktop and mobile sizes for review or visual verification. Use after changing the page or when the user asks to see the current UI.
 ---
 
 # Skill: capture-ui
 
 Capture screenshots of the page at the scroll positions affected by a change,
-for PR reviews or visual verification.
+for review or visual verification.
 
 This is a **skill**: the agent decides which sections and scroll positions
 show the change best.
 
 ## When to use
 
-- Invoked by the `draft-pr` skill when a PR touches `src/`, `index.html`, or
-  styles.
+- After changing `src/`, `index.html`, or styles, before the change is
+  committed (see [`git-workflow.md`](../../context/dev-spec/git-workflow.md)).
 - Or directly, when the user wants screenshots of the current UI.
 
 ## Prerequisites
@@ -61,7 +61,7 @@ show the change best.
    scrolls by. If the emulated viewport is larger than the preview pane,
    screenshots can look scaled into a corner — confirm geometry with
    `getBoundingClientRect` before calling it a bug.
-4. **Save** images to `./.pr-screenshots/` (git-ignored — never commit
+4. **Save** images to `./.screenshots/` (git-ignored — never commit
    screenshots).
 5. **Return** the list of image paths with a one-line caption each.
 
@@ -98,12 +98,6 @@ section's `--p` (`el.style.getPropertyValue('--p')`), element
 Resizing the viewport while hidden does not reach the `ResizeObserver`s
 (canvas size, hero scatter), so reload at the new size first. Show the pane
 for the final screenshots when possible.
-
-## Embedding in a PR
-
-`gh pr create` cannot upload local images. Ask the user to drag the images
-into the PR description, or reference already-hosted URLs. Never block the PR
-on screenshots; list the local paths if hosting isn't possible.
 
 ## Failure handling
 
