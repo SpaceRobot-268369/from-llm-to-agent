@@ -27,8 +27,8 @@ Used by `commit` and `resolve-conflicts`.
   `true`.
 - **Set up:** if the project is not a repository yet, ask the developer before
   running `git init`. All work is committed directly on `main`; branches and
-  worktrees are not used (Principle 6). Adding a remote is a developer
-  decision; ask first.
+  worktrees are not used (Principle 6). The remote `origin` is the public
+  GitHub repo; pushing (or changing remotes) needs the developer's approval.
 
 ## Browser / preview tooling
 

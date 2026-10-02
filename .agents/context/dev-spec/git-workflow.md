@@ -48,11 +48,15 @@ Examples: `feat(scene-rag): add the retrieval shelf`,
 
 ## Remote and pushing
 
-There is no remote yet. Adding one, and every push, needs explicit approval
-(Principles 3 and 5). **Never `--force`**, never rewrite history.
+`origin` is the **public** GitHub repo
+[SpaceRobot-268369/from-llm-to-agent](https://github.com/SpaceRobot-268369/from-llm-to-agent),
+and local `main` tracks `origin/main`. Because the repo is public, a push
+publishes: every push needs explicit approval (Principles 3 and 5), separate
+from the commit's. Push only fast-forwards (`git push`); **never `--force`**,
+never rewrite history.
 
 ## Conflicts
 
 Rare on a single branch. They mostly come from `git stash pop`, a future
-`git pull` once a remote exists, or a revert or cherry-pick. Resolve them with
+`git pull` from `origin`, or a revert or cherry-pick. Resolve them with
 [`resolve-conflicts`](../../skills/resolve-conflicts/SKILL.md).

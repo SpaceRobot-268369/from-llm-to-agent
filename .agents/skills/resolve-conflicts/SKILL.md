@@ -10,7 +10,7 @@ resolve safely. The flow is always: diagnose → report → resolve → verify �
 hand back.
 
 All work happens on `main` (Principle 6), so conflicts are rare. They mostly
-come from `git stash pop`, a `git pull` once a remote exists, or a revert or
+come from `git stash pop`, a `git pull` from `origin`, or a revert or
 cherry-pick: committed `main` (HEAD) on one side, the incoming change on the
 other.
 
