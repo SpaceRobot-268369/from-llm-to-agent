@@ -2,7 +2,7 @@
 
 A single-page, scroll-linked field guide to AI buzzwords, for a general
 audience. Every new word is **one more box around the same model**. The page
-is told in three parts:
+is told in three chapters:
 
 - **Model** — where the intelligence comes from.
 - **Memory** — AI doesn't have memory, only context.
@@ -18,7 +18,7 @@ inspired by 飞天闪客 —
 
 ## Quick start
 
-Requires Node ≥ 20.19.
+Requires Node `^20.19 || >=22.12` (Vite 8).
 
 ```bash
 npm install

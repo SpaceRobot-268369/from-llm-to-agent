@@ -13,8 +13,9 @@ For each tool: how to **check** it's ready, and how to **set it up** if not.
 
 Used by every frontend task (`start-local-dev`, `capture-ui`, builds).
 
-- **Check:** `node -v` reports **≥ 20.19** (Vite 8 requirement; 22 LTS or newer
-  recommended), `npm -v` works, and `node_modules/` exists at the repo root.
+- **Check:** `node -v` satisfies **^20.19 || >=22.12** (Vite 8's `engines`
+  range; Node 21 and 22.0–22.11 fall outside it), `npm -v` works, and
+  `node_modules/` exists at the repo root.
 - **Set up:** install Node from nodejs.org or `brew install node`, then run
   `npm install` from the repo root.
 

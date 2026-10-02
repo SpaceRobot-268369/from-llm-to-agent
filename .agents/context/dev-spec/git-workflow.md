@@ -6,10 +6,9 @@ This project uses **one checkout that switches branches**. **Do not create Git
 worktrees** (Principle 6). If a task seems to need parallel checkouts, finish
 or commit the current work first, then switch branches.
 
-> The directory is not a Git repository until someone runs `git init`. Agents
-> ask before initializing it. The initial scaffold commit of a fresh
-> repository may go on `main` (with explicit approval); every later change
-> goes on a branch.
+> The repository is initialised: `main` holds the initial scaffold commit,
+> the one commit made directly on `main` (with explicit approval). Every later
+> change goes on a branch.
 
 ## Branch syntax
 

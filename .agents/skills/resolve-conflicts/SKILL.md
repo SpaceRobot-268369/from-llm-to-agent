@@ -41,9 +41,10 @@ It never pushes.
    types.
 3. **Diagnose** each file: what each side intended, the cost of keeping
    `main`, and the cost of keeping the branch. Project special cases:
-   - `src/content/sections.ts` — section order and numbering must match
-     `content-outline.md`. Merge both sides' sections in build order, then
-     renumber.
+   - `src/content/sections.ts` — section order must match
+     `content-outline.md`. Merge both sides' sections in build order; the
+     code numbers topics itself, so renumber only the outline and
+     `references.md` by hand.
    - `src/engine/scenes/index.ts` — registry: keep the union.
    - `package-lock.json` — don't hand-merge. Take `main`'s version, then run
      `npm install`.

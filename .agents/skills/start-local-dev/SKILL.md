@@ -14,8 +14,9 @@ alternatives.
 
 ## Prerequisites
 
-> Requires Node ≥ 20.19 and npm. If unmet, tell the developer and guide setup
-> via [`../../context/dev-spec/prerequisites.md`](../../context/dev-spec/prerequisites.md),
+> Requires Node `^20.19 || >=22.12` (Vite 8) and npm. If unmet, tell the
+> developer and guide setup via
+> [`../../context/dev-spec/prerequisites.md`](../../context/dev-spec/prerequisites.md),
 > then stop.
 
 ## Steps
@@ -37,6 +38,6 @@ alternatives.
 
 ## Failure handling
 
-Report the failure and the reason, for example: Node too old, `npm install`
-failed (include the error), port already taken by a different app, or Vite
-compile error (include the first error lines).
+Report the failure and the reason, for example: Node outside the supported
+range, `npm install` failed (include the error), port already taken by a
+different app, or Vite compile error (include the first error lines).

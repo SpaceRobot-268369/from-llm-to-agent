@@ -20,28 +20,39 @@ reference.
 ```
 .
 ├── index.html                # fonts, root element
-├── vite.config.ts
+├── vite.config.ts, tsconfig.json
+├── public/                   # favicon.svg
 ├── src/
 │   ├── main.tsx              # React bootstrap
-│   ├── App.tsx               # page composition: PixelField + HUD + sections
+│   ├── App.tsx               # page composition: PixelField + HUD + sections + Loader
 │   ├── content/
-│   │   └── sections.ts       # ALL page copy, analogies, watch captions, palettes, scene ids
+│   │   └── sections.ts       # ALL page copy, chapters, palettes, scene ids; numbers topics (2.3)
 │   ├── engine/
 │   │   ├── ticker.ts         # the one rAF loop: Lenis, section geometry, progress, palette vars
-│   │   ├── phases.ts         # 3-act timing (headline → read → watch), shared with CSS via --ph-* vars
-│   │   ├── layout.ts         # cell sizes, grid geometry, art box (side ↔ focus)
+│   │   ├── phases.ts         # modes (part / read / watch / scaling), placement(); --ph-* vars for CSS
+│   │   ├── layout.ts         # cell sizes, grid geometry, art box (side ↔ focus, hero centre), heroHole
+│   │   ├── intro.ts          # loader → hero hand-off: intro.at, sticker BURST timing
 │   │   ├── color.ts          # hex/mix/contrast helpers
 │   │   ├── noise.ts          # hash + value noise + fbm + easing
 │   │   ├── raster.ts         # grid-resolution buffer (ink + accent channels)
-│   │   ├── halftone.ts       # buffer → quantized halftone squares on the canvas
-│   │   ├── PixelField.tsx    # fixed full-screen canvas; blends scenes by scroll
-│   │   ├── debug.ts          # DEV ONLY: window.__scene / __sceneBench / __goto
-│   │   └── scenes/           # types.ts, helpers.ts, one file per scene, index.ts registry
+│   │   ├── halftone.ts       # buffer → quantized halftone marks (square / dash / cross per chapter)
+│   │   ├── PixelField.tsx    # fixed full-screen canvas; topic dissolve, chapter wipe
+│   │   ├── debug.ts          # DEV ONLY: window.__scene / __sceneBench / __goto / __ticker
+│   │   └── scenes/
+│   │       ├── types.ts      # Scene contract, SceneId
+│   │       ├── helpers.ts    # shared drawing helpers (INK / ACC, shapes, pixel text)
+│   │       ├── index.ts      # SCENES registry
+│   │       ├── part.ts       # intentionally empty: chapter cards show no diagram
+│   │       └── one file per scene: hero, tokens, scaling, thinking, chat, system, window,
+│   │           memory, rag, tools, agent, mcp, skill, agentfiles, subagents, agents, unwrap
 │   ├── components/
-│   │   ├── Section.tsx       # hero + concept section; HeadlineCard + Watch (shared)
+│   │   ├── Hero.tsx          # centred headline + scattered buzzword stickers (burst, pull-in, jump)
+│   │   ├── ChapterCard.tsx   # full-screen chapter opener: numeral, name, thesis, contents list
+│   │   ├── Section.tsx       # topic section; HeadlineCard, Watch, product switcher
 │   │   ├── ScalingSection.tsx# sticky stage: milestones, counters, chart, plateau question
 │   │   ├── Finale.tsx        # unwrap ladder, three-questions watch act, credit line
-│   │   ├── Hud.tsx           # TopBar, ProgressRail, StackTrail
+│   │   ├── Hud.tsx           # TopBar, ProgressRail, StackTrail, BackToTop
+│   │   ├── Loader.tsx        # pixel-cell loading screen; sets intro.at when done
 │   │   └── CodeBlock.tsx, Formula.tsx, TokenDemo.tsx
 │   └── styles/
 │       └── global.css        # tokens, layout, reveal rules, responsive rules
@@ -54,12 +65,13 @@ reference.
    - the current section `cur`, its local progress `p` (0→1 across its
      sticky phase), and `blend` (0→1 as the next section slides in);
    - the global progress.
-2. It writes `--p` on every section element near the viewport (CSS reveals
-   read it), and the blended palette (`--bg`, `--ink`, `--px`, `--accent`) on
-   `:root`.
+2. It writes `--p` on each section element whose progress changed (CSS
+   reveals read it), and the blended palette (`--bg`, `--ink`, `--px`,
+   `--accent`) on `:root`.
 3. `PixelField` paints scene `cur` (and scene `next` while blending) into
-   grid-resolution rasters, dissolves them together, and draws halftone
-   squares.
+   grid-resolution rasters, clips each to its art box, blends them (a blocky
+   dissolve between topics, a left → right wipe between chapters), and draws
+   halftone marks in the chapter's shape (squares / dashes / crosses).
 4. HUD components update text through refs. **No React state changes per
    frame.**
 
@@ -70,9 +82,10 @@ reference.
   interface labels (`UI`: "In plain words", "Scroll", aria labels) all live
   there. The file must match
   [`content-outline.md`](../products/content-outline.md).
-- **Scenes are pure painters.** A scene receives `{ r, box, p, t, cell }` and
-  paints into the raster. It holds no DOM refs and no React state. Normalize
-  every coordinate to `box`, so it works at any grid size. See
+- **Scenes are pure painters.** A scene receives
+  `{ r, box, full, p, t, cell, mobile }` and paints into the raster. It holds
+  no DOM refs and no React state. Normalize every coordinate to `box`, so it
+  works at any grid size. See
   [`design-language.md`](../products/design-language.md#scene).
 - **Ink vs. accent channels.** Paint ordinary pixels with `INK(a)` and
   highlighted pixels with `ACC(a)`. Never hardcode a color in a scene; colors
@@ -86,10 +99,11 @@ reference.
 - **Reduced motion.** With `prefers-reduced-motion: reduce`: Lenis off, scene
   time frozen, reveals shown immediately. Keep that path working.
 - **Responsive.** Below 900px wide, or under 640px tall, sections stop being
-  sticky (except the scaling stage, which keeps its sticky stage). The art
-  stays in the top band (no focus glide); copy and headline cards scroll over
-  solid panels. Watch steps flow as a list below a clear window, and the
-  ticker drives those scenes from the list's position (`mobileScene`).
+  sticky (except the hero and the scaling stage, which keep their sticky
+  stages). The art stays in the top band (no focus glide; the hero keeps its
+  centred frame); copy and headline cards scroll over solid panels. Watch
+  steps flow as a list below a clear window, and the ticker drives those
+  scenes from the list's position (`mobileScene`).
 - **Desktop fit.** Each concept's read-act copy must fit 1280×720. Trim the
   copy before shrinking the type.
 - **Phase timing has one source.** Act timings live in
@@ -104,7 +118,16 @@ reference.
   `window.__sceneBench(id, { p })` (dev only) before adding per-cell work.
   Bake expensive noise into lookup textures, as `scenes/scaling.ts` does.
 - **Debug hooks are dev-only.** `src/engine/debug.ts` is loaded through a
-  dynamic import behind `import.meta.env.DEV`, so it never ships.
+  dynamic import behind `import.meta.env.DEV`, so it never ships. It installs
+  `window.__scene` (ASCII render), `__sceneBench`, `__goto(id, progress)` and
+  `__ticker` (the ticker itself). A hidden preview pane pauses rAF and
+  `ResizeObserver`, so drive frames by hand with
+  `__ticker.tick(performance.now())`, and move the scroll with
+  `__ticker.lenis.scrollTo(y, { immediate: true, force: true })`: the ticker
+  reads Lenis's position, and `window.scrollTo` (which `__goto` uses) is not
+  seen while the pane is hidden. Under reduced motion there is no Lenis
+  (`lenis` is `null`), so plain `window.scrollTo` works. Full recipe:
+  [`capture-ui`](../../skills/capture-ui/SKILL.md#hidden-preview-pane).
 
 ## Commands
 
