@@ -3,8 +3,8 @@
 > Every number, date, and attribution on the page must trace to an entry here
 > (content rule in [`content-outline.md`](content-outline.md)). This list is
 > **internal** — for fact-checking only. The page shows no reference list,
-> just two small credit lines in the footer: the source video and the blog
-> post.
+> just two small credit lines in the footer: the source video and the two
+> blog posts.
 
 ## Content inspiration
 

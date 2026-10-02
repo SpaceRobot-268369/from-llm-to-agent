@@ -723,8 +723,10 @@ export const FINALE = {
     youtubeLabel: 'YouTube',
     bilibiliLabel: 'Bilibili',
     bilibili: 'https://www.bilibili.com/video/BV1ojfDBSEPv/',
-    blogLead: 'Structure from',
-    blogTitle: 'AI Agents: Memory, Harness, Model',
-    blog: 'https://lucascanoblog.com/archives/2412',
+    blogLead: 'Built on the blog posts',
+    blogs: [
+      { title: 'AI Agents: Memory, Harness, Model', href: 'https://lucascanoblog.com/archives/2412' },
+      { title: 'Build the Superpower', href: 'https://lucascanoblog.com/archives/2366' },
+    ],
   },
 };

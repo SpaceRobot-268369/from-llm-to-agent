@@ -95,7 +95,7 @@ diagram.
   is faint.
 - **No reference list on the page.** Sources live in
   [`references.md`](references.md) for fact-checking only. The footer carries
-  two small credit lines (the video and the blog post).
+  two small credit lines (the video and the two blog posts).
 
 ## Chapters
 
@@ -573,8 +573,9 @@ to each scene's beats.
   window? → Model — where does the intelligence come from? → Next month's new word? Usually the
   same model, in a new box.
 - **Formula:** `Agent = Model + Memory + Harness`
-- **Footer:** two credit lines: 飞天闪客's video (YouTube · Bilibili) and the
-  blog post *AI Agents: Memory, Harness, Model*. No reference list.
+- **Footer:** two credit lines: 飞天闪客's video (YouTube · Bilibili), and the
+  blog posts *AI Agents: Memory, Harness, Model* (the three-chapter
+  structure) and *Build the Superpower* (agent files, 2.4). No reference list.
 
 ---
 

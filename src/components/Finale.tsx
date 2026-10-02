@@ -69,9 +69,14 @@ export function Credits() {
       </p>
       <p>
         {c.blogLead}{' '}
-        <a href={c.blog} target="_blank" rel="noreferrer">
-          {c.blogTitle}
-        </a>
+        {c.blogs.map((b, i) => (
+          <span key={b.href}>
+            {i > 0 && ' · '}
+            <a href={b.href} target="_blank" rel="noreferrer">
+              {b.title}
+            </a>
+          </span>
+        ))}
       </p>
     </footer>
   );
