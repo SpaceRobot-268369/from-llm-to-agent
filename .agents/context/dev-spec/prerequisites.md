@@ -30,6 +30,15 @@ Used by `commit` and `resolve-conflicts`.
   worktrees are not used (Principle 6). The remote `origin` is the public
   GitHub repo; pushing (or changing remotes) needs the developer's approval.
 
+## Docker (optional)
+
+Only needed to build or run the production image (see the README's Docker
+section); local development uses npm alone.
+
+- **Check:** `docker --version`, and `docker info` reaches a running daemon.
+- **Set up:** install Docker Desktop (or Docker Engine on Linux). Building on
+  Apple Silicon for an x86 server needs `--platform linux/amd64`.
+
 ## Browser / preview tooling
 
 Used by `capture-ui` and visual verification.

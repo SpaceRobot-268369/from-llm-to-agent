@@ -81,6 +81,7 @@ full-screen chapter card:
 | Path | What it is |
 |------|------------|
 | `index.html` | Vite entry; font links. |
+| `Dockerfile`, `docker/`, `compose.yaml` | Production image: Node build stage, then nginx (non-root, port 8080) serving `dist/`; see the README's Docker section. |
 | `src/content/` | All page copy, analogies, watch captions, UI labels and palettes (`sections.ts`). The page has no reference list; fact sources live in `.agents/context/products/references.md`. |
 | `src/engine/` | Ticker (scroll + palette), Pixel Field canvas, halftone renderer, scenes. |
 | `src/components/` | Hero, chapter cards, section layouts, loader, and HUD (top bar, progress rail, stack trail, back-to-top). |

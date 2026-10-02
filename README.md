@@ -32,6 +32,28 @@ npm run dev        # http://localhost:5173
 | `npm run build` | type check + production build to `dist/` |
 | `npm run preview` | serve the production build |
 
+## Docker
+
+The [`Dockerfile`](Dockerfile) builds the site with Node, then serves `dist/`
+from nginx running as a non-root user on port **8080** (config in
+[`docker/`](docker/)): hashed assets cached for a year, the page itself
+revalidated on every load, gzip, basic security headers, and a `/healthz`
+endpoint used by the image's health check.
+
+```bash
+docker compose up -d --build   # http://localhost:8080
+```
+
+Without Compose:
+
+```bash
+docker build -t from-llm-to-agent .
+docker run -d --name from-llm-to-agent -p 8080:8080 --restart unless-stopped from-llm-to-agent
+```
+
+Building on Apple Silicon for an x86 server: add `--platform linux/amd64` to
+`docker build`. The site needs no environment variables or secrets.
+
 ## Where things live
 
 - **Copy:** [`src/content/sections.ts`](src/content/sections.ts) (designed

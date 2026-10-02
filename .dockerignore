@@ -1,0 +1,21 @@
+# Keep the build context to what the image needs (see Dockerfile COPY lines).
+node_modules
+dist
+.git
+.vite
+*.tsbuildinfo
+
+# docs, agent files and local tooling are not part of the site
+.agents
+.claude
+.screenshots
+*.md
+
+# never send env files into a build (the site needs no secrets)
+.env
+.env.*
+
+.DS_Store
+*.log
+.idea
+.vscode

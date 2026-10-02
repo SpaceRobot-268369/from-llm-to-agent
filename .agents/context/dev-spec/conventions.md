@@ -21,6 +21,9 @@ reference.
 .
 ├── index.html                # fonts, root element
 ├── vite.config.ts, tsconfig.json
+├── Dockerfile                # node:22 build stage → nginx-unprivileged serving dist/ on :8080
+├── compose.yaml              # docker compose up -d --build
+├── docker/                   # nginx.conf (caching, gzip, /healthz) + security-headers.conf
 ├── public/                   # favicon.svg
 ├── src/
 │   ├── main.tsx              # React bootstrap
