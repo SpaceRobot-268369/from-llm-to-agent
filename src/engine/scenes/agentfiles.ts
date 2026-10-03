@@ -25,7 +25,9 @@
  *                MEMORY stays expanded.
  *   0.95 – 1     hold.
  * t only pulses the cursor; everything reads at t = 0. On phones the same
- * story loops in time instead of following the scroll (loopP).
+ * story loops in time instead of following the scroll (the ticker's
+ * mobileScene, as for every READ section): wait, play, hold the finished
+ * picture, then cut back to an empty window (a new session).
  *
  * Arrangements: the tree BESIDE the window ('h', most boxes), or ABOVE it
  * ('v', tall narrow desktop boxes such as 1024×768). Pages, the stream and the
@@ -99,20 +101,6 @@ const NOTE_FLY: [number, number] = [0.77, 0.85];
 const GLOW_IN: [number, number] = [0.84, 0.87];
 const GLOW_OUT: [number, number] = [0.89, 0.95];
 const MEM_OFF: [number, number] = [0.9, 0.93];
-
-/**
- * Phones: the art band is only in clear view before the copy scrolls over it,
- * so there the story plays on a loop in time (as in `system`) — wait, play,
- * hold the finished picture, then cut back to an empty window (a new
- * session). t = 0 (reduced motion) holds the finished picture.
- */
-const LOOP = 12;
-function loopP(t: number): number {
-  if (t === 0) return 1;
-  const s = t % LOOP;
-  if (s < 0.8) return 0;
-  return Math.min(1, (s - 0.8) / 8.4);
-}
 
 // ── kits ────────────────────────────────────────────────────────────────
 
@@ -612,9 +600,8 @@ function rowLen(L: Lay, i: number, steps: boolean) {
 }
 
 const scene: Scene = {
-  paint({ r, box, p: scroll, t, mobile }) {
+  paint({ r, box, p, t }) {
     const g = r.begin();
-    const p = mobile ? loopP(t) : scroll;
     const L = layout(box);
     const { row, rows, textX, pw, ph, x0, y0, cx } = L;
     const { wx, wy, ww, wh } = L;

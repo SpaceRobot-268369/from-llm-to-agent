@@ -116,7 +116,12 @@ reference.
   centred frame); copy and headline cards scroll over solid panels. Watch
   steps flow as a list below a clear window, and the ticker drives those
   scenes from the list's position (`mobileScene`); 1.1's scene and token demo
-  are driven the same way from the demo's position.
+  are driven the same way from the demo's position. The other read scenes
+  loop in time (`MOBILE_LOOP` in `phases.ts`), because the copy covers the
+  art band early. The top bar keeps a solid band behind its labels and a
+  matching band rises behind the stack trail and Top button, so flowing copy
+  never runs under HUD text; panels split at a chapter wipe's front like the
+  HUD.
 - **Desktop fit.** Each concept's read-act copy must fit 1280×720. Trim the
   copy before shrinking the type.
 - **Phase timing has one source.** Act timings live in

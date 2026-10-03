@@ -56,6 +56,22 @@ export const PHASES = {
   },
 } as const satisfies Record<string, Timing>;
 
+/**
+ * Phones: a READ section's art band is in clear view only before its copy
+ * scrolls over it, so there its story loops in time instead of following the
+ * scroll — wait, play, hold the finished picture, cut back to the start. The
+ * ticker starts each section's clock as its clear top reaches the art band
+ * (mobileScene). Seconds.
+ */
+export const MOBILE_LOOP = { wait: 0.8, play: 8, hold: 3 } as const;
+
+/** Scene progress `s` seconds into a phone READ section's loop. */
+export function mobileLoop(s: number): number {
+  const { wait, play, hold } = MOBILE_LOOP;
+  const k = s % (wait + play + hold);
+  return k < wait ? 0 : Math.min(1, (k - wait) / play);
+}
+
 export type Mode = keyof typeof PHASES;
 
 export function modeOf(s: Section): Mode | null {

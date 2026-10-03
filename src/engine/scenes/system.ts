@@ -20,9 +20,9 @@
  *   0.72 – 0.78  … and the core lights up: it has read every part.
  *   0.78 – 1     hold; the arrow's dots keep flowing (t).
  * Accent marks the hidden parts and their flow; your side stays ink.
- * Everything reads at t = 0. On phones the art band is clear only before the
- * copy scrolls over it, so there the same story loops in time (loopP) and
- * reduced motion holds the finished picture.
+ * Everything reads at t = 0. On phones the same story loops in time (the
+ * ticker's mobileScene, as for every READ section) and reduced motion holds
+ * the finished picture.
  *
  * Layout: whole cells, the largest kit that fits the box (cached per box).
  * Desktop side boxes put the model (ringed, labelled) to the right of the
@@ -268,22 +268,6 @@ const SCAN: [number, number] = [0.52, 0.66];
 const FLOW: [number, number] = [0.6, 0.74];
 /** The core lights up (a wipe from the arrow's side). */
 const LIT: [number, number] = [0.72, 0.78];
-
-/**
- * Phones: the art band is only in clear view before the copy scrolls over it
- * (and while the section dissolves in), so there the story plays on a loop in
- * time — wait, play, hold the finished picture, rewind. t = 0 (reduced
- * motion) holds the finished picture.
- */
-const LOOP = 10;
-function loopP(t: number): number {
-  if (t === 0) return 1;
-  const s = t % LOOP;
-  if (s < 0.6) return 0;
-  if (s < 6.4) return ((s - 0.6) / 5.8) * LIT[1];
-  if (s < 9.3) return 1;
-  return LIT[1] * (1 - easeOut((s - 9.3) / 0.7));
-}
 
 // ── kits ────────────────────────────────────────────────────────────────
 
@@ -693,9 +677,8 @@ function model(g: G, L: Lay, lit: number) {
 }
 
 const scene: Scene = {
-  paint({ r, box, p: scroll, t, mobile }) {
+  paint({ r, box, p, t }) {
     const g = r.begin();
-    const p = mobile ? loopP(t) : scroll;
     const L = layout(box);
     const { k, fx, fy, fw, fh, cardW, cardH } = L;
 

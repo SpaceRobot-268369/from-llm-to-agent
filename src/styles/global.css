@@ -1206,6 +1206,7 @@ li[data-active] .ms__caption {
   font-size: 12px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  text-wrap: balance;
   text-shadow: 0 0 10px var(--bg), 0 0 4px var(--bg);
 }
 
@@ -1527,8 +1528,19 @@ li[data-active] .ms__caption {
     width: auto;
     margin: 0 var(--gutter);
     padding: 22px 18px 24px;
-    background: var(--bg);
     border: 1px solid var(--faint);
+  }
+  /* panels show the colour the canvas shows under them: during a chapter wipe
+     they split at its front like the HUD (--panel-x: where the panel's
+     padding box starts, from the viewport's left edge) */
+  .sec__copy,
+  .card,
+  .chapter__text {
+    --panel-x: calc(var(--gutter) + 1px);
+    background: linear-gradient(90deg, var(--bg-l) calc(var(--split-x) - var(--panel-x)), var(--bg-r) 0);
+  }
+  .chapter__text {
+    --panel-x: var(--gutter);
   }
   .rv {
     opacity: 1;
@@ -1563,7 +1575,6 @@ li[data-active] .ms__caption {
   .card {
     margin: 0 var(--gutter) 16px;
     padding: 22px 18px 24px;
-    background: var(--bg);
     border: 1px solid var(--faint);
   }
   .card__title {
@@ -1592,6 +1603,12 @@ li[data-active] .ms__caption {
   .watch__steps li {
     grid-area: auto;
     justify-self: stretch;
+    /* split at a chapter wipe's front, like the panels above */
+    background: linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--bg-l) 92%, transparent) calc(var(--split-x) - var(--gutter) - 1px),
+      color-mix(in srgb, var(--bg-r) 92%, transparent) 0
+    );
     opacity: 1;
     transform: none;
     font-size: 15px;
@@ -1617,7 +1634,6 @@ li[data-active] .ms__caption {
   }
   .chapter__text {
     padding: 16px 18px;
-    background: var(--bg);
   }
   .products__item {
     grid-area: auto;
@@ -1749,6 +1765,24 @@ li[data-active] .ms__caption {
   .topbar {
     grid-template-columns: auto minmax(0, 1fr);
     column-gap: 12px;
+  }
+  /* copy scrolls under the HUD here: the band stays solid behind the labels */
+  .topbar::before {
+    -webkit-mask-image: linear-gradient(#000 calc(100% - 12px), transparent);
+    mask-image: linear-gradient(#000 calc(100% - 12px), transparent);
+  }
+  /* … and the same band rises behind the trail and the Top button (it hides
+     with the trail, on the hero, where nothing scrolls under them) */
+  .trail::before {
+    content: '';
+    position: fixed;
+    inset: auto 0 0;
+    z-index: -1;
+    height: 56px;
+    background: var(--bg-split);
+    -webkit-mask-image: linear-gradient(transparent, #000 20px);
+    mask-image: linear-gradient(transparent, #000 20px);
+    pointer-events: none;
   }
   .topbar__r {
     min-width: 0;

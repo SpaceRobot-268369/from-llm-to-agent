@@ -10,7 +10,7 @@
 import Lenis from 'lenis';
 import { SECTIONS } from '../content/sections';
 import { contrast, css, hex, mix, type RGB } from './color';
-import { writePhaseVars } from './phases';
+import { mobileLoop, modeOf, writePhaseVars } from './phases';
 import { wipeFront } from './wipe';
 
 export type FrameColors = { bg: RGB; ink: RGB; px: RGB; accent: RGB };
@@ -42,8 +42,9 @@ export type Frame = {
   /**
    * Mobile only: scene progress driven by where an anchor is on screen — the
    * WATCH steps list (so the animation plays while the steps are read), or
-   * the next-token demo (so its steps play while it is fully in view).
-   * null for sections without either.
+   * the next-token demo (so its steps play while it is fully in view) — or,
+   * for the other READ sections, by a loop in time (phases.ts mobileLoop).
+   * null for the rest.
    */
   mobileScene: (number | null)[];
 };
@@ -61,6 +62,9 @@ type Rec = {
   demo: HTMLElement | null;
   dTop: number;
   dBottom: number;
+  /** a READ section: on mobile its story loops in time; the loop's start (clock s, -1 = not running) */
+  loop: boolean;
+  since: number;
 };
 
 const PALETTES = SECTIONS.map((s) => ({
@@ -128,6 +132,8 @@ class Ticker {
         demo: el.querySelector<HTMLElement>('.tokdemo'),
         dTop: 0,
         dBottom: 0,
+        loop: modeOf(SECTIONS[index]) === 'read',
+        since: -1,
       };
     } else {
       this.recs[index] = undefined;
@@ -294,6 +300,15 @@ class Ticker {
         const b = Math.max(a + vh * 0.3, rec.dTop - vh * 0.1);
         const m = (y - a) / (b - a);
         f.mobileScene[i] = m < 0 ? 0 : m > 1 ? 1 : m;
+      } else if (f.mobile && rec.loop) {
+        // the copy covers the art band early, so the story loops in time: the
+        // clock starts as the section's clear top reaches the band's lower
+        // edge, and resets once the section is off screen; reduced motion
+        // holds the finished picture
+        const rel = rec.top - y;
+        if (rel >= vh || rel + rec.height <= 0) rec.since = -1;
+        else if (rec.since < 0 && rel <= vh * 0.45) rec.since = clock;
+        f.mobileScene[i] = f.reduced ? 1 : rec.since < 0 ? 0 : mobileLoop(clock - rec.since);
       } else {
         f.mobileScene[i] = null;
       }

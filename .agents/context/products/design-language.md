@@ -249,9 +249,11 @@ type Scene = {
 
 - `p` is the **scene progress**: the section's sticky progress remapped by
   `sceneProgress()` to the act where the story plays (`PHASES[mode].scene`);
-  raw section progress on mobile, or the steps-list position for mobile
-  watch sections (and the next-token demo's position for 1.1, so its steps
-  play while the whole demo is on screen). **p = 0 must be a complete composition**: on desktop it is
+  on mobile, the steps-list position for watch sections, the next-token
+  demo's position for 1.1 (so its steps play while the whole demo is on
+  screen), and a loop in time for the other read sections (`MOBILE_LOOP` in
+  `phases.ts`: wait, play, hold the finished picture, restart), whose clock
+  starts as the section's clear top reaches the art band. **p = 0 must be a complete composition**: on desktop it is
   the frame shown as the diagram fades in with the read act (nothing, not
   even a ghost, shows behind a headline card) and, for watch sections, the
   one held through the whole read act. On mobile, where the art band stays
@@ -260,9 +262,9 @@ type Scene = {
 - `t` is time in seconds, frozen at 0 under reduced motion. Motion is
   ambient; the meaning must survive `t = 0`. The exception is **chat**: at
   p = 0 (its read act) it loops the forgetful new-session story on `t`
-  every 9s, and at `t = 0` it holds the "?" frame. On phones, `system` and
-  `agentfiles` also play on `t` (`loopP`), because the copy covers their art
-  band early; at `t = 0` they hold the finished picture.
+  every 9s, and at `t = 0` it holds the "?" frame. On phones every read
+  scene loops in time (see `p`), because the copy covers the art band early;
+  under reduced motion it holds the finished picture.
 - Budget: **≤ 1.5 ms per paint** on the desktop grid.
 
 **Tools.** Helpers in
