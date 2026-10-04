@@ -44,6 +44,12 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* fast taps (the click pops' combo) are taps, not a double-tap zoom; pinch zoom still works */
+html,
+body {
+  touch-action: manipulation;
+}
+
 /* Lenis */
 html.lenis,
 html.lenis body {

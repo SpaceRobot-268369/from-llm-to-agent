@@ -5,15 +5,16 @@
  * section slides in, the next scene) into grid-resolution rasters, clips each
  * to its art box (so diagrams never overlap text), blends them — a blocky
  * dissolve between topics, a directional wipe between chapters — adds dust and
- * a soft pointer halo, then draws quantized halftone marks in the chapter's
- * mark shape (squares / dashes / crosses).
+ * a soft pointer halo, layers the click pops on top (pops/live.ts), then draws
+ * quantized halftone marks in the chapter's mark shape (squares / dashes /
+ * crosses).
  *
  * Section phases (see phases.ts) decide where each scene sits (beside the
  * text, or centred in a WATCH act) and how visible it is (nothing while a
  * headline card is up).
  */
 import { useEffect, useRef } from 'react';
-import { css, VIVID } from './color';
+import { css, luminance, VIVID } from './color';
 import { heroHole } from './layout';
 import { drawHalftone, MARK, TONE_ACC, TONE_INK, TONE_VIVID } from './halftone';
 import { chapterOf, type Section } from '../content/sections';
@@ -23,6 +24,8 @@ import { Raster } from './raster';
 import { SCENES } from './scenes';
 import { artRect, BASE_CELL_DESKTOP, BASE_CELL_MOBILE, grid, toGrid } from './layout';
 import { placement } from './phases';
+import { PopBuffer } from './pops/buffer';
+import { pops, type FieldInfo } from './pops/live';
 import { ticker, type Frame } from './ticker';
 import { EDGE, wipeFront } from './wipe';
 /** soft, slow halo around the mouse — kept subtle so it never competes with reading */
@@ -31,6 +34,8 @@ const POINTER_RATE = 3; // re-rolls per second
 const POINTER_STRENGTH = 0.22;
 /** cells of slack around the art box before clipping */
 const CLIP_MARGIN = 1;
+/** an accent this light renders as paper (chapter cards, signature sections): pops draw their blush in ink there */
+const PAPER_ACCENT = 0.7;
 
 function markOf(s: Section): number {
   return MARK[chapterOf(s)?.mark ?? 'square'];
@@ -83,7 +88,13 @@ export function PixelField() {
     const ctx = canvas.getContext('2d', { alpha: false })!;
     const A = new Raster();
     const B = new Raster();
+    const P = new PopBuffer();
+    // the grid as rendered, for laying pops out at click time (kept current every frame)
+    const field: FieldInfo = { cols: 0, rows: 0, cell: 1, offX: 0, offY: 0, scene: new Float32Array(0), y: 0, dy: 0 };
+    pops.field = field;
     let values = new Float32Array(0);
+    /** each cell's scene value before dust and halo — pops read it to stay off diagrams */
+    let scene = new Float32Array(0);
     let tones = new Uint8Array(0);
     let marks = new Uint8Array(0);
     // draw at the canvas's own CSS size — innerWidth includes a classic
@@ -122,6 +133,7 @@ export function PixelField() {
       const n = cols * rows;
       if (values.length !== n) {
         values = new Float32Array(n);
+        scene = new Float32Array(n);
         tones = new Uint8Array(n);
         marks = new Uint8Array(n);
       }
@@ -190,6 +202,7 @@ export function PixelField() {
               }
             }
           }
+          scene[i] = v;
           // dust: sparse print speckle across the whole field
           const dz = hash2(x, y, 97);
           if (dz > 0.991 && !(quiet && x >= quiet[0] && x < quiet[1] && y >= quiet[2] && y < quiet[3])) {
@@ -211,6 +224,37 @@ export function PixelField() {
           values[i] = v;
           tones[i] = tone;
           marks[i] = mark;
+        }
+      }
+
+      // pops: the click animations sit on top of the field — where a pop
+      // paints, its cell replaces whatever was there; its punch thins the field
+      field.cols = cols;
+      field.rows = rows;
+      field.cell = cell;
+      field.offX = offX;
+      field.offY = offY;
+      field.scene = scene;
+      field.dy = f.y - field.y;
+      field.y = f.y;
+      if (pops.any) {
+        P.resize(cols, rows);
+        P.clear();
+        const paper = luminance(f.colors.accent) > PAPER_ACCENT;
+        pops.paint(P, { clock: f.clock, cell, offX, offY, mobile: f.mobile, reduced: f.reduced, paper });
+        for (let y = P.y0; y < P.y1; y++) {
+          for (let x = P.x0; x < P.x1; x++) {
+            const i = y * cols + x;
+            const h = P.hole[i];
+            if (h > 0) values[i] *= 1 - h;
+            const pi = P.ink[i];
+            const pa = P.acc[i];
+            const pv = pi > pa ? pi : pa;
+            if (pv > 0.02) {
+              values[i] = pv;
+              tones[i] = pa > pi ? TONE_ACC : TONE_INK;
+            }
+          }
         }
       }
 
@@ -242,8 +286,11 @@ export function PixelField() {
     };
 
     const off = ticker.onFrame(render);
+    const offPops = pops.listen();
     return () => {
       off();
+      offPops();
+      pops.field = null;
       ro.disconnect();
     };
   }, []);

@@ -41,7 +41,9 @@ reference.
 │   │   ├── halftone.ts       # buffer → halftone marks (square / dash / cross per chapter) in ink / accent / vivid
 │   │   ├── PixelField.tsx    # fixed full-screen canvas; topic dissolve, chapter wipe
 │   │   ├── wipe.ts           # EDGE, wipeFront(): the wipe front, shared by the canvas and the split chrome
-│   │   ├── debug.ts          # DEV ONLY: window.__scene / __sceneBench / __goto / __ticker
+│   │   ├── debug.ts          # DEV ONLY: window.__scene / __sceneBench / __goto / __ticker / __pop*
+│   │   ├── pops/             # click pops: live.ts (input, routing, deck, fit, boop, combo), hit.ts (empty-space test),
+│   │   │                     # helpers / types / buffer, ascii.ts (dev only), one file per pop
 │   │   └── scenes/
 │   │       ├── types.ts      # Scene contract, SceneId
 │   │       ├── helpers.ts    # shared drawing helpers (INK / ACC, shapes, pixel text)
@@ -80,7 +82,8 @@ reference.
    grid-resolution rasters, clips each to its art box, blends them (a blocky
    dissolve between topics, a left → right wipe between chapters), and draws
    halftone marks in the chapter's shape (squares / dashes / crosses), in
-   the ink, accent or tagged vivid colour.
+   the ink, accent or tagged vivid colour. Live click pops (`pops/live.ts`)
+   are painted into a PopBuffer and layered on top before the halftone pass.
 4. HUD components update text through refs. **No React state changes per
    frame.**
 
@@ -135,11 +138,15 @@ reference.
   a 2020 laptop at 1440×900; each scene's paint ≤ 1.5 ms. Measure with
   `window.__sceneBench(id, { p })` (dev only) before adding per-cell work.
   Bake expensive noise into lookup textures, as `scenes/scaling.ts` does.
+  Each pop's paint ≤ 0.05 ms (`__popBench`); a click's fit search shares its
+  DOM probes through one per-click `Page` snapshot.
 - **Debug hooks are dev-only.** `src/engine/debug.ts` is loaded through a
   dynamic import behind `import.meta.env.DEV`, so it never ships. It installs
   `window.__scene(id, { p, t, mobile, W, H, focus, side })` (ASCII render;
   vivid-tagged cells show as `1`–`5` / `a`–`e`), `__sceneBench`,
-  `__goto(id, progress)` and `__ticker` (the ticker itself). A hidden preview
+  `__goto(id, progress)`, `__ticker` (the ticker itself), and for the click
+  pops `__pop`, `__popBench`, `__popCells`, `__popAudit`, `__popSpawn`,
+  `__popClick` and `__pops`. A hidden preview
   pane pauses rAF and `ResizeObserver`, so drive frames by hand with
   `__ticker.tick(now)`, `now` growing ~16 ms per call, and move the scroll
   with `__ticker.lenis.scrollTo(y, { immediate: true, force: true })`: the ticker

@@ -32,7 +32,7 @@ Each frame:
    **Ink & accent channels**).
 3. Clip each to its art box, combine with the **dissolve** (topics) or
    **wipe** (chapters), apply the act's visibility, and add **dust** and the
-   **pointer halo**.
+   **pointer halo**. Layer any live click **pops** on top.
 4. Draw with the **halftone** renderer.
 
 **Key knobs.** `BASE_CELL_DESKTOP` = 9px and `BASE_CELL_MOBILE` = 7px in
@@ -331,6 +331,63 @@ reduced motion.
 
 **Key knobs:** `POINTER_RADIUS`, `POINTER_RATE`, `POINTER_STRENGTH` in
 `PixelField.tsx`.
+
+## Pops
+
+**What it means.** Small, cute pixel animations that play where the visitor
+clicks or taps **empty space**: bare Pixel Field, never text, buttons, links,
+code, figures, the HUD (including its fixed bands) or an opaque panel. They
+are painted in the Pixel Field like everything else, in the section's ink and
+accent, and their mid-tones take the chapter's mark, so each pop has three
+looks for free. Six critters make up the deck: **box-cat**, **boo-ghost**,
+**star-crumble**, **bot-agent**, **goldfish** and **cursor-boing**. Most wear
+the hero stickers' two-dot face. Each lives 1.2–1.7 s and leaves with the
+page's blocky crumble. Pops sit outside a section's story, so the accent rule
+(one new idea per section) doesn't bind them: their accent is decoration
+(tape, blush, the sparkle, the goldfish).
+
+- **Deck.** Each click deals the next pop from a shuffled deck, with no
+  repeats until all six have played. The first click in a new chapter deals
+  that chapter's own pop (`HOME`: hero star-crumble, Model cursor-boing,
+  Memory box-cat, Harness and finale bot-agent).
+- **Fit.** A pop appears only where its whole footprint is bare page: inside
+  the grid, clear of the HUD, mostly off the diagrams (scene ink), and clear
+  of text (DOM probes). It may nudge up to 3 cells to find room. If no deck
+  pop fits, a small **twinkle** answers instead. On phones, open space is
+  scarce (the art band holds the diagram and copy sits on panels), so pops
+  mostly appear on the hero and the chapter cards.
+- **Boop.** Clicking a live pop pauses it: it squints, and a little heart
+  puffs up where there's room. A third boop makes it shy, and it hurries out.
+- **Combo (wrap-it-up).** Rapid clicks in one spot tickle the pop, and the
+  4th click starts the combo. Each later click (5th–7th) wraps one more box
+  around a sleeping core, in the hero's ring tones, while it fits. Then the
+  boxes come off outermost-first, the core wakes, looks at the pointer and
+  sends up a heartbeat: the page's idea as a toy.
+- **Rules for every pop.** Tones only on the exact ladder (1 / .75 / .5 /
+  .25, plus a .15 speckle for still cells); fades step down it at ≥ 60 ms a
+  step; no cell flips solid → empty → solid within 250 ms; blinks and hops
+  last ≥ 80 ms; ink and accent never share a cell; something is drawn on the
+  very first frame. `popAudit` checks tones, reach, overlap and the first
+  frame.
+- **Anchored to the viewport.** Scrolling hurries pops out, and no new pop
+  starts while the page is still gliding; past 8 on screen, the oldest hurries
+  out.
+- **Reduced motion.** Nothing moves: each pop is one still frame that fades or
+  crumbles in place. A boop changes the face and restarts the still's hold
+  (for the combo, only its reward).
+- **Phones.** `touch-action: manipulation` on `html` and `body` keeps fast
+  taps from turning into a double-tap zoom; pinch zoom still works.
+
+**Reference:** [`src/engine/pops/`](../../../src/engine/pops/), one file per
+pop. `live.ts` is input, routing (chain → boop → spawn), deck, fit, pauses,
+hurry and painting; `hit.ts` is the empty-space test (a per-click `Page`
+snapshot); `helpers.ts` holds the sprite legend, timing helpers (`Span`,
+`until`, `steps`) and shapes; `types.ts` is the paint contract. PixelField
+layers the PopBuffer over the field: a pop's cell replaces the field's, and
+its punch thins it. In dev, `window.__pop(id, { k })` returns an ASCII render,
+`__popAudit(id)` checks the paint contract, `__popSpawn(id)` plays a pop live
+and `__popClick(x, y)` routes a click. **Key knobs** (`live.ts`): `MAX_LIVE`,
+`CHAIN_MS` / `CHAIN_CELLS`, `SPAWN_GAP`, `NUDGE`, `SCENE_SHARE`, `BOOP_PAUSE`.
 
 ## Cursor pulse
 

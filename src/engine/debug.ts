@@ -11,12 +11,24 @@
  * colour (Raster.col → VIVID[0..2] in color.ts: blue, violet, magenta),
  * strong / mid. Rows are squashed 2:1 so shapes keep their aspect.
  *
+ * Pops (the click animations, see pops/live.ts):
+ *   window.__pop('box-cat', { k: 0.3 })      → ASCII of the cells around the click
+ *   window.__popBench('box-cat')             → avg ms per paint
+ *   window.__popCells('box-cat', { age: .57 }, [[0, -10], [3, -9]]) → the glyphs at cells around the click
+ *   window.__popAudit('box-cat')             → { problems, worstMs }: reach, ink/accent overlap, first frame, exact tones
+ *   window.__popSpawn('box-cat', x, y)       → play it live, skipping the deck and fit (default: viewport centre)
+ *   window.__popClick(x, y)                  → route a click there as the page would (deck, fit, boop, chain)
+ *   window.__pops                            → the live pops (deck, chain, pops in flight)
+ *
  * The scaling scene reads the live mini-chart rects (layout.chartHole: at
  * rest and at full zoom, in viewport fractions, measured at the window's
  * size): pass W / H equal to the window's for a faithful layout.
  * window.__chartHole shows them.
  */
 import { artRect, BASE_CELL_DESKTOP, BASE_CELL_MOBILE, chartHole, grid, toGrid, type Side } from './layout';
+import { popAscii, popAudit, popBench, popCells } from './pops/ascii';
+import type { PopId } from './pops';
+import { pops } from './pops/live';
 import { Raster } from './raster';
 import { SCENES } from './scenes';
 import type { SceneId } from './scenes/types';
@@ -113,6 +125,13 @@ declare global {
     __goto?: (id: string, progress: number) => void;
     __ticker?: typeof ticker;
     __chartHole?: typeof chartHole;
+    __pop?: typeof popAscii;
+    __popBench?: typeof popBench;
+    __popCells?: typeof popCells;
+    __popAudit?: typeof popAudit;
+    __popSpawn?: (id: PopId, x?: number, y?: number) => void;
+    __popClick?: (x: number, y: number, touch?: boolean) => void;
+    __pops?: typeof pops;
   }
 }
 
@@ -121,6 +140,13 @@ export function installDebugHooks() {
   window.__ticker = ticker;
   window.__chartHole = chartHole;
   window.__sceneBench = bench;
+  window.__pop = popAscii;
+  window.__popBench = popBench;
+  window.__popCells = popCells;
+  window.__popAudit = popAudit;
+  window.__popSpawn = (id, x = window.innerWidth / 2, y = window.innerHeight / 2) => pops.spawn(x, y, id);
+  window.__popClick = (x, y, touch = false) => pops.click(x, y, touch);
+  window.__pops = pops;
   window.__goto = (id, progress) => {
     const el = document.getElementById(id);
     if (!el) throw new Error(`no section #${id}`);
